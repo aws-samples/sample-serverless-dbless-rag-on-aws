@@ -1,0 +1,5 @@
+faiss-cpu
+langchain-aws
+langchain-community
+boto3
+pypdf

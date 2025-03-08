@@ -1,0 +1,61 @@
+{
+  "util": {
+    "navbar": {
+      "title": "Serverless RAG コンソール",
+      "lang": "Language(日本語)",
+      "logout": "ログアウト"
+    },
+    "routes": {
+      "home": "ホーム",
+      "dashboard": "ダッシュボード",
+      "embedding": "ドキュメント埋め込み",
+      "ragchat": "RAG チャット"
+    }
+  },
+  "pages" :{
+    "home" : {
+      "title": "Serverless RAG コンソール",
+      "description": "このアプリケーションは、デプロイした RAG へのドキュメントの投入とチャットを行うためのコンソールです。",
+      "quickstart": {
+        "title": "クイックスタート",
+        "step1": "まずは、資料 (PDF) を S3 バケットに入れる必要があります。",
+        "step1link": "ドキュメント埋め込みページに移動",
+        "step1failure": "資料が一つも格納されていません",
+        "step1success": "資料が格納されています",
+        "step2": "資料を S3 バケットに配置すると、埋め込みが自動で始まるので待ちます。",
+        "step2failure": "埋め込みがまだ完了していません",
+        "step2success": "埋め込みが完了しました",
+        "step3": "こちらでチャットができます。"
+      },
+      "architecture": "アーキテクチャ"
+    },
+    "dashboard" : {
+      "title": "ダッシュボード",
+      "description": "このダッシュボードは、本ソリューションでデプロイした RAG システムの情報を表示します。",
+      "architecture": "アーキテクチャ",
+      "metrics": "メトリクス",
+      "embeddingprocessqueue": "埋め込み処理待ち資料の数",
+      "update": "更新"
+    },
+    "embedding" : {
+      "title": "ドキュメント埋め込み",
+      "description": "このページでは S3 バケットに資料(PDF) をアップロードすると自動で埋め込みが始まります。 \n すでにアップロードした資料と、埋め込み後のインデックスファイルのサイズを確認できます。",
+      "upload": "アップロード",
+      "draganddrop": "ここにファイルをドラッグ＆ドロップするか、クリックしてファイルを選択してください。",
+      "drophere": "ここにファイルをドロップ",
+      "uploaded": "アップロード済み資料",
+      "embeddedindex": "埋め込み後インデックス",
+      "name": "名前",
+      "size": "サイズ",
+      "date": "最終更新日"
+    },
+    "ragchat" : {
+      "title": "RAG チャット",
+      "description": "このページで、RAG を使用したチャットボットと会話ができます。",
+      "placeholder": "入力してください",
+      "ask" : "質問する",
+      "page"  : "ページ",
+      "references": "参照情報"
+    }
+  }
+}

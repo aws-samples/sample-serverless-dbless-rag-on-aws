@@ -1,0 +1,61 @@
+{
+  "util": {
+    "navbar": {
+      "title": "Serverless RAG Console",
+      "lang": "Language (English)",
+      "logout": "Logout"
+    },
+    "routes": {
+      "home": "Home",
+      "dashboard": "Dashboard",
+      "embedding": "Document Embedding",
+      "ragchat": "RAG Chat"
+    }
+  },
+  "pages": {
+    "home": {
+      "title": "Serverless RAG Console",
+      "description": "This application is a console for ingesting documents into the deployed RAG and chatting with it.",
+      "quickstart": {
+        "title": "Quick Start",
+        "step1": "First, you need to put your documents (PDF) into the S3 bucket.",
+        "step1link": "Go to the Document Embedding page",
+        "step1failure": "No documents are stored",
+        "step1success": "Documents are stored",
+        "step2": "Once you place the documents in the S3 bucket, the embedding process will start automatically, so please wait.",
+        "step2failure": "The embedding process is not complete yet",
+        "step2success": "The embedding process is complete",
+        "step3": "You can chat here."
+      },
+      "architecture": "Architecture"
+    },
+    "dashboard": {
+      "title": "Dashboard",
+      "description": "This dashboard displays information about the RAG system deployed by this solution.",
+      "architecture": "Architecture",
+      "metrics": "Metrics",
+      "embeddingprocessqueue": "Number of documents waiting for embedding process",
+      "update": "Update"
+    },
+    "embedding": {
+      "title": "Document Embedding",
+      "description": "On this page, the embedding process will start automatically when you upload your documents (PDF) to the S3 bucket. You can check the already uploaded documents and the size of the embedded index files.",
+      "upload": "Upload",
+      "draganddrop": "Drag and drop files here, or click to select files.",
+      "drophere": "Drop files here",
+      "uploaded": "Uploaded Documents",
+      "embeddedindex": "Embedded Index",
+      "name": "Name",
+      "size": "Size",
+      "date": "Last Updated"
+    },
+    "ragchat": {
+      "title": "RAG Chat",
+      "description": "On this page, you can chat with the chatbot using RAG.",
+      "placeholder": "Type your message here",
+      "ask": "Ask",
+      "page": "Page",
+      "references": "References"
+    }
+  }
+}
