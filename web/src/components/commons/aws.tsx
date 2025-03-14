@@ -34,11 +34,16 @@ export const putObject = async (bucket:string, keys:File[]) => {
             credentials: credential,
         });
 
+        
+
         for (const file of keys) {
+
+            const fileContent = await file.arrayBuffer();
+
             const params = {
                 Bucket: bucket,
                 Key: file.name,
-                Body: file,
+                Body: fileContent,
                 ContentType: file.type,
             };
 
