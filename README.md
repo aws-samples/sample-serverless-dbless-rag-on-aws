@@ -38,6 +38,8 @@ npm install
 cdk deploy --context createFrontend=true --context generateInitialUser=true
 ```
 
+You can access the document embedding and search functionality through a GUI by accessing the deployed CloudFront URL.
+
 ## Deploy without Frontend
 
 ```bash
@@ -65,31 +67,35 @@ Estimated costs when this solution is deployed in ap-northeast-1 region are as f
 
 ### 1000 Question answering with RAG costs
 
-| Service               |                                      Item | total volume | cost (USD) |
+| Service               |                                      Item | Total volume | Cost (USD) |
 |-----------------------|------------------------------------------:|-------------:|-----------:|
-| Lambda                |                            duration (sec) |     2 * 1000 |    0.03333 |
-| Lambda                |                                  requests |         1000 |     0.0002 |
-| Bedrock               |               Claude 3 Haiku, input token |  1000 * 1000 |       0.25 |
-| Bedrock               |              Claude 3 Haiku, output token |   300 * 1000 |      0.375 |
-| Total estimated cost	 |                                         - |            - |    0.65373 |
+| Lambda(x86, 2GB)      |                         GB-Duration (sec) |     2 * 1000 |    0.03333 |
+| Lambda                |                        Number of requests |         1000 |     0.0002 |
+| Bedrock               |     Claude 3 Haiku Number of input tokens |  1000 * 1000 |       0.25 |
+| Bedrock               |     Claude 3 Haiku Number of output token |   300 * 1000 |      0.375 |
+| Total estimated cost  |                                         - |            - |    0.65373 |
 
 
 ### 1 MB documents Embedding costs
 
-| Service               |                                       Item | total volume | cost (USD) |
+| Service               |                                       Item | Total volume | Cost (USD) |
 |-----------------------|-------------------------------------------:|-------------:|-----------:|
-| Lambda                |                             duration (sec) |           20 |     0.0083 |
-| Bedrock               |  Amazon Titan Text Embeddings, input token |        30000 |      0.006 |
-| Total estimated cost	　|                                          - |            - |     0.0143 |
+| Lambda(x86, 4GB)      |                          GB-Duration (sec) |       4 * 20 |     0.0133 |
+| Bedrock               |  Amazon Titan Text Embeddings Number of input token amounts | 30000 |  0.006 |
+| Total estimated cost	|                                          - |            - |     0.0143 |
 
 
 ### Monthly storage costs
 
-| Service                |                                  Item | total volume |         cost (USD) |
+| Service                |                                  Item | Total volume |         Cost (USD) |
 |------------------------|--------------------------------------:|-------------:|-------------------:|
-| ECR                    |                      Image size  (GB) |            1 |                0.1 |
+| ECR                    |                        Image size(GB) |            1 |                0.1 |
 | S3                     |                            Assets(GB) |            1 |              0.025 |
 
+Notes:
+- The costs presented are for reference purposes only, as actual costs will vary based on the embedded content and search usage.
+- AWS provides a Free Tier offering for select services. These calculations do not include Free Tier benefits; therefore, actual costs may be lower than the estimated amounts shown.
+- This cost estimation is based on pricing in the AWS Asia Pacific (Tokyo) Region. In the event of any discrepancy between the prices shown herein and those published on the official AWS website, the pricing on the official AWS website shall prevail.
 
 
 ## Security
