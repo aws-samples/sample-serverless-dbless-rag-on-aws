@@ -224,6 +224,14 @@ export class Frontend {
 
 
 
+        NagSuppressions.addStackSuppressions(scope, [
+            {
+            id: 'AwsSolutions-L1', 
+            reason: 'In this pj, nodejs version 20 is used for deploy-time-build'
+            }
+        ]);
+  
+
         NagSuppressions.addResourceSuppressionsByPath(scope,
             ['/ServerlessRAG/web-idpool-auth-role/DefaultPolicy/Resource',]
         ,[{ id: "AwsSolutions-IAM5", reason: "Policies of this resouce are restricted manually.",},
@@ -243,14 +251,6 @@ export class Frontend {
         NagSuppressions.addStackSuppressions(scope, [
             { id: 'CdkNagValidationFailure', reason: 'We are using an intrinsic function to generate frontend resource' }
         ]);
-
-
-        NagSuppressions.addResourceSuppressionsByPath(scope,
-            ['/ServerlessRAG/NodejsBuildCustomResourceHandler25648b212c404f09aa65b6bbb0c44659/Resource',
-            '/ServerlessRAG/AWS679f53fac002430cb0da5b7982bd2287/Resource',
-            '/ServerlessRAG/Custom::CDKBucketDeployment8693BB64968944B69AAFB0CC9EB8756C/Resource'],
-            [{ id: "AwsSolutions-L1", reason: "In this pj, nodejs version 20 is used for deploy-time-build",},]);
-
 
         NagSuppressions.addResourceSuppressions(
             distribution,
