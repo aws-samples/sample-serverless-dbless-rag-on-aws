@@ -18,6 +18,22 @@ Architecture is mainly composed of serverless, event-driven AWS services to deli
     - Amazon Titan Embed Text V1
     - Claude 3 Haiku
 
+## QuickStart
+You can deploy using following commands.
+```bash
+git clone <this repository>
+cd <Project Directory>
+cd cdk
+npm install
+cdk deploy --context createFrontend=true --context generateInitialUser=true --context enableSnapStart=true
+```
+
+## Enable Lambda SnapStart
+You can deploiy with lambda snapstart option to decrease cold start for improving user experience
+```bash
+cdk deploy --context enableSnapStart=true
+```
+
 
 ## Deploy with Frontend
 You can deploy with frontend by setting `createFrontend` context to true.

@@ -13,6 +13,23 @@
     - Claude 3 Haiku
 
 
+## クイックスタート
+以下コマンドを実行することで Serverless RAG を開始することができます
+```bash
+git clone <this repository>
+cd <Project Directory>
+cd cdk
+npm install
+cdk deploy --context createFrontend=true --context generateInitialUser=true --context enableSnapStart=true
+```
+
+## Lambda SnapStart の有効化
+以下オプションを設定することで、Lambda SnapStart を有効化しコールドスタートの影響を抑えることで UX を向上することができます
+You can deploiy with lambda snapstart option to decrease cold start for improving user experience
+```bash
+cdk deploy --context enableSnapStart=true
+```
+
 ### フロントエンドを含める場合のデプロイ
 `createFrontend`コンテキストをtrueに設定することで、フロントエンドを含めてデプロイできます。
 ```bash
