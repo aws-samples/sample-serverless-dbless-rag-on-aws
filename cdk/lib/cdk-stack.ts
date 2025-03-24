@@ -13,11 +13,26 @@ import {Names} from 'aws-cdk-lib';
 import {SqsEventSource} from 'aws-cdk-lib/aws-lambda-event-sources';
 import {Frontend} from './frontend';
 import { NagSuppressions } from "cdk-nag";
+import * as pythonlambda from '@aws-cdk/aws-lambda-python-alpha';
 
 
 interface CdkStackProps extends cdk.StackProps {
     createFrontend: boolean;
     generateInitialUser: boolean;
+    enableSnapStart: boolean;
+}
+
+// アーキテクチャの判定関数
+function getHostArchitecture(): lambda.Architecture {
+    switch (process.arch) {
+      case 'arm64':
+        return lambda.Architecture.ARM_64;
+      case 'x64':
+        return lambda.Architecture.X86_64;
+      default:
+        console.warn(`Unrecognized architecture: ${process.arch}, defaulting to X86_64`);
+        return lambda.Architecture.X86_64;
+    }
 }
 
 
@@ -51,7 +66,6 @@ export class CdkStack extends cdk.Stack {
         assetBucket.addEventNotification(s3.EventType.OBJECT_CREATED_PUT, new s3n.SqsDestination(queue));
 
 
-
         const vectorBucket = new s3.Bucket(this, 'ragvectorbucket' + Names.uniqueId(this),
             {
                 blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
@@ -62,47 +76,13 @@ export class CdkStack extends cdk.Stack {
             }
         );
 
-
-        //  ==  == == ==  ==  ==  ==  == ECR ==  ==  ==  ==  ==  ==  ==  ==
-        const embeddingImageAsset = new ecr_assets.DockerImageAsset(this, 'embeddingImage', {
-            directory: './containers/embedding',
-        });
-        const retrievingImageAsset = new ecr_assets.DockerImageAsset(this, 'retrievingImage', {
-            directory: './containers/retrieving',
-        });
-
-        // ECR repository
-        const embeddingRepo = new ecr.Repository(this, 'embedding', {
-            emptyOnDelete: true,
-            removalPolicy: cdk.RemovalPolicy.DESTROY,
-            repositoryName: 'embedding',
-        });
-
-        const embeddingDeploy = new ecr_deploy.ECRDeployment(this, 'embeddingDockerImage', {
-            src: new ecr_deploy.DockerImageName(embeddingImageAsset.imageUri),
-            dest: new ecr_deploy.DockerImageName(`${cdk.Aws.ACCOUNT_ID}.dkr.ecr.${cdk.Aws.REGION}.amazonaws.com/${embeddingRepo.repositoryName}:latest`),
-        })
-
-        const retrievingRepo = new ecr.Repository(this, 'retrieving', {
-            emptyOnDelete: true,
-            removalPolicy: cdk.RemovalPolicy.DESTROY,
-            repositoryName: 'retrieving',
-        });
-
-        const retrievingDeploy = new ecr_deploy.ECRDeployment(this, 'retrievingDockerImage', {
-            src: new ecr_deploy.DockerImageName(retrievingImageAsset.imageUri),
-            dest: new ecr_deploy.DockerImageName(`${cdk.Aws.ACCOUNT_ID}.dkr.ecr.${cdk.Aws.REGION}.amazonaws.com/${retrievingRepo.repositoryName}:latest`),
-        })
-
-
+        //  ==  == == ==  ==  ==  ==  == Lambda Role ==  ==  ==  ==  ==  ==  ==  ==
         const embeddingresultLogGroup = new logs.LogGroup(this, 'SRAGLogs', {
             retention: logs.RetentionDays.ONE_MONTH,
             removalPolicy: cdk.RemovalPolicy.DESTROY,
             logGroupName: "ServerlessRAGLogs",
         });
 
-
-        //  ==  == == ==  ==  ==  ==  == Lambda Functions ==  ==  ==  ==  ==  ==  ==  ==
         const lambdaRole = new iam.Role(this, 'LambdaExecutionRole', {
             assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
             managedPolicies: [
@@ -129,22 +109,22 @@ export class CdkStack extends cdk.Stack {
         );
 
 
-        const searchFunction = new lambda.DockerImageFunction(this, 'SearchFunction', {
-            code: lambda.DockerImageCode.fromEcr(
-                retrievingRepo, {
-                    tagOrDigest: "latest"
-                }
-            ),
-            environment: {
-                MATERIALBUCKET: assetBucket.bucketName,
-                VECTORBUCKET: vectorBucket.bucketName,
-            },
-            role: lambdaRole,
-            timeout: cdk.Duration.minutes(5),
-            memorySize: 2048
+        //  ==  == == ==  ==  ==  ==  == Embedding resources==  ==  ==  ==  ==  ==  ==  ==
+        const embeddingImageAsset = new ecr_assets.DockerImageAsset(this, 'embeddingImage', {
+            directory: './containers/embedding',
         });
-        searchFunction.node.addDependency(retrievingDeploy);
 
+        // ECR repository
+        const embeddingRepo = new ecr.Repository(this, 'embedding', {
+            emptyOnDelete: true,
+            removalPolicy: cdk.RemovalPolicy.DESTROY,
+            repositoryName: 'embedding',
+        });
+
+        const embeddingDeploy = new ecr_deploy.ECRDeployment(this, 'embeddingDockerImage', {
+            src: new ecr_deploy.DockerImageName(embeddingImageAsset.imageUri),
+            dest: new ecr_deploy.DockerImageName(`${cdk.Aws.ACCOUNT_ID}.dkr.ecr.${cdk.Aws.REGION}.amazonaws.com/${embeddingRepo.repositoryName}:latest`),
+        })
 
         const embeddingFunction = new lambda.DockerImageFunction(this, 'EmbeddingFunction', {
             code: lambda.DockerImageCode.fromEcr(
@@ -167,6 +147,83 @@ export class CdkStack extends cdk.Stack {
             batchSize: 1,
             }
         ))
+
+
+        //  ==  == == ==  ==  ==  ==  == Retrieving resources==  ==  ==  ==  ==  ==  ==  ==
+        let searchFunction;
+        if (props?.enableSnapStart) {
+            searchFunction = new pythonlambda.PythonFunction(this, 'Retrieving', {
+                entry: 'functions/retrieving',
+                runtime: lambda.Runtime.PYTHON_3_12,
+                architecture: getHostArchitecture(),
+                index: 'main.py', 
+                handler: 'lambda_handler',
+                timeout: cdk.Duration.minutes(5),
+                memorySize: 2048,
+                snapStart: lambda.SnapStartConf.ON_PUBLISHED_VERSIONS,
+                environment: {
+                    MATERIALBUCKET: assetBucket.bucketName,
+                    VECTORBUCKET: vectorBucket.bucketName,
+                },
+                role: lambdaRole,
+                layers: [
+                  new pythonlambda.PythonLayerVersion(this, 'layer', {
+                    entry: 'functions/layer',
+                    compatibleRuntimes: [lambda.Runtime.PYTHON_3_12],
+                    // FIXME: 現在実行元マシンによってアーキテクチャを変えているので統一する
+                    compatibleArchitectures: [getHostArchitecture()],
+                    removalPolicy: cdk.RemovalPolicy.DESTROY,
+                    bundling: {
+                        command: [
+                            "bash",
+                             "-c",
+                            "pip install \
+                                --implementation cp \
+                                --python-version 3.12 \
+                                --only-binary=:all: --upgrade \
+                                -r requirements.txt -t /asset-output/python",
+                            'find ./python -name "*.pyc" -delete',
+                            'find ./python -name "*.pyo" -delete',
+                            'find ./python -name "__pycache__" -delete',
+                            'rm -r /asset-output/python/botocore/',
+                            'rm -r /asset-output/python/boto3/',
+                            ]
+                    }
+                  }),
+                ],
+              });
+
+        } else {
+            const retrievingImageAsset = new ecr_assets.DockerImageAsset(this, 'retrievingImage', {
+                directory: './containers/retrieving',
+            });
+    
+            const retrievingRepo = new ecr.Repository(this, 'retrieving', {
+                emptyOnDelete: true,
+                removalPolicy: cdk.RemovalPolicy.DESTROY,
+                repositoryName: 'retrieving',
+            });
+    
+            const retrievingDeploy = new ecr_deploy.ECRDeployment(this, 'retrievingDockerImage', {
+                src: new ecr_deploy.DockerImageName(retrievingImageAsset.imageUri),
+                dest: new ecr_deploy.DockerImageName(`${cdk.Aws.ACCOUNT_ID}.dkr.ecr.${cdk.Aws.REGION}.amazonaws.com/${retrievingRepo.repositoryName}:latest`),
+            })
+    
+            searchFunction = new lambda.DockerImageFunction(this, 'SearchFunction', {
+                code: lambda.DockerImageCode.fromEcr(
+                    retrievingRepo, {
+                        tagOrDigest: "latest"
+                    }
+                ),
+                environment: {
+                    MATERIALBUCKET: assetBucket.bucketName,
+                    VECTORBUCKET: vectorBucket.bucketName,
+                },
+                role: lambdaRole,
+                timeout: cdk.Duration.minutes(5),
+                memorySize: 2048
+            });
+        }
 
 
         //  ==  == ==  ==  ==  ==  ==  == Frontend ==  ==  ==  ==  ==  ==  ==  ==
@@ -250,7 +307,14 @@ export class CdkStack extends cdk.Stack {
             ],
         );
 
-
+        NagSuppressions.addStackSuppressions(
+            this,
+            [
+                {
+                    id: 'AwsSolutions-L1',
+                    reason: 'Temporary disable dis suggestion because we will deal with this for other requests'},
+            ],
+        );
 
     }
 }

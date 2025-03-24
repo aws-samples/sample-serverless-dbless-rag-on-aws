@@ -21,21 +21,22 @@ embedding = BedrockEmbeddings(model_id=EMBEDDING_MODELID)
 VECTORBUCKET = os.getenv("VECTORBUCKET")
 vectorbucket = boto3.resource("s3",).Bucket(VECTORBUCKET)
 
-
 def load_vectordata():
     if not os.path.exists(VECTOR_PATH):
         os.makedirs(VECTOR_PATH)
 
-    for obj in vectorbucket.objects.filter(Prefix=""):
-        if obj.key.endswith('/'):
-            continue
-        file_path = VECTOR_PATH +"/"+ obj.key.replace("", "")
-        print(file_path)
-        vectorbucket.download_file(obj.key, file_path)
-
-
-load_vectordata()
-VECTORSTORE = FAISS.load_local(VECTOR_PATH, embedding, allow_dangerous_deserialization=True)
+    # FAISSファイルのダウンロード
+    faiss_file_path = os.path.join(VECTOR_PATH, "index.faiss")
+    vectorbucket.download_file(
+        "index.faiss", 
+        faiss_file_path,
+    )
+    # PKLファイルのダウンロード
+    pkl_file_path = os.path.join(VECTOR_PATH, "index.pkl")
+    vectorbucket.download_file(
+        "index.pkl", 
+        pkl_file_path,
+    )
 
 # プロンプトの定義
 prompt_template = '''Human:
@@ -50,31 +51,44 @@ A:
 '''
 
 
-chain_type_kwargs = {"prompt": PromptTemplate(
-    template=prompt_template, input_variables=["context", "question"]
-)}
-llm = ChatBedrock(
-    model_id=GENERATION_MODELID,
-)
-qa = RetrievalQA.from_chain_type(
-    llm=llm,
-    chain_type="stuff",
-    retriever=VECTORSTORE.as_retriever(),
-    chain_type_kwargs=chain_type_kwargs,
-    return_source_documents=True,
-)
+def load_local_to_faiss():
+    VECTORSTORE = FAISS.load_local(VECTOR_PATH, embedding, allow_dangerous_deserialization=True)
+    return VECTORSTORE
 
+def gen_RetrievalQA_instance(VECTORSTORE, prompt_template):
+    chain_type_kwargs = {"prompt": PromptTemplate(
+        template=prompt_template, input_variables=["context", "question"]
+    )}
+    llm = ChatBedrock(model_id=GENERATION_MODELID,)
+    QA = RetrievalQA.from_chain_type(
+        llm=llm,
+        chain_type="stuff",
+        retriever=VECTORSTORE.as_retriever(),
+        chain_type_kwargs=chain_type_kwargs,
+        return_source_documents=True,
+    )
+
+    return QA
+
+
+def init():
+    load_vectordata()
+    VECTORSTORE = load_local_to_faiss()
+    QA = gen_RetrievalQA_instance(VECTORSTORE, prompt_template)
+    return QA
+
+
+# init 処理開始
+qa, ntotal = init()
 
 def lambda_handler(event, context):
-    logger.info('==== INVOKE HANDLER ====')
     question = event.get("question", "EC2とはなんですか？")
     answer = qa(question)
-    logger.info('==== COMPLETE TASK ====')
-    print(answer)
 
     references = [doc.metadata for doc in answer['source_documents']]
     result={"result": answer['result'], "references":references}
     
+    print(result)
     return {
         'statusCode': 200,
         'body': str(json.dumps(result, ensure_ascii=False))
@@ -82,3 +96,4 @@ def lambda_handler(event, context):
     
 if __name__ == '__main__':
     lambda_handler({}, {})
+

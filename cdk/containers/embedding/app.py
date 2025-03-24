@@ -40,7 +40,7 @@ def chunking(file_path):
         if file_extension == ".pdf":
             loader = PyPDFLoader(file_path=file_path)
         else:
-            raise ValueError("Supported file types are PDF and HTML only")
+            raise ValueError("Supported file types are PDF only")
 
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=CHUNK_SIZE)
         data = loader.load()
