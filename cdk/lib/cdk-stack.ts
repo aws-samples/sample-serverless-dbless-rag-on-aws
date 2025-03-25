@@ -8,10 +8,10 @@ import * as ecr_deploy from 'cdk-ecr-deployment';
 import * as sqs from 'aws-cdk-lib/aws-sqs';
 import * as s3n from 'aws-cdk-lib/aws-s3-notifications';
 import * as logs from 'aws-cdk-lib/aws-logs';
-import {Construct} from 'constructs';
-import {Names} from 'aws-cdk-lib';
-import {SqsEventSource} from 'aws-cdk-lib/aws-lambda-event-sources';
-import {Frontend} from './frontend';
+import { Construct } from 'constructs';
+import { Names } from 'aws-cdk-lib';
+import { SqsEventSource } from 'aws-cdk-lib/aws-lambda-event-sources';
+import { Frontend } from './frontend';
 import { NagSuppressions } from "cdk-nag";
 import * as pythonlambda from '@aws-cdk/aws-lambda-python-alpha';
 
@@ -25,13 +25,13 @@ interface CdkStackProps extends cdk.StackProps {
 // アーキテクチャの判定関数
 function getHostArchitecture(): lambda.Architecture {
     switch (process.arch) {
-      case 'arm64':
-        return lambda.Architecture.ARM_64;
-      case 'x64':
-        return lambda.Architecture.X86_64;
-      default:
-        console.warn(`Unrecognized architecture: ${process.arch}, defaulting to X86_64`);
-        return lambda.Architecture.X86_64;
+        case 'arm64':
+            return lambda.Architecture.ARM_64;
+        case 'x64':
+            return lambda.Architecture.X86_64;
+        default:
+            console.warn(`Unrecognized architecture: ${process.arch}, defaulting to X86_64`);
+            return lambda.Architecture.X86_64;
     }
 }
 
@@ -52,7 +52,7 @@ export class CdkStack extends cdk.Stack {
         );
 
         const dlq = new sqs.Queue(this, 'EmbeddingProcessDeadLetterQueue', {
-                queueName: 'EmbeddingProcess-DLQ',
+            queueName: 'EmbeddingProcess-DLQ',
         });
         const queue = new sqs.Queue(this, 'EmbeddingProcessQueue',
             {
@@ -93,7 +93,7 @@ export class CdkStack extends cdk.Stack {
 
         lambdaRole.addToPolicy(new iam.PolicyStatement({
             actions: ['s3:ListBucket', 's3:GetObject', 's3:PutObject', 's3:AbortMultipartUpload'],
-            resources: [assetBucket.bucketArn,assetBucket.bucketArn+"/*",vectorBucket.bucketArn,vectorBucket.bucketArn+"/*"],
+            resources: [assetBucket.bucketArn, assetBucket.bucketArn + "/*", vectorBucket.bucketArn, vectorBucket.bucketArn + "/*"],
         })
         );
         lambdaRole.addToPolicy(new iam.PolicyStatement({
@@ -102,10 +102,10 @@ export class CdkStack extends cdk.Stack {
         })
         );
         lambdaRole.addToPolicy(new iam.PolicyStatement({
-                actions: ['bedrock:InvokeModel'],
-                resources: [`arn:aws:bedrock:${cdk.Aws.REGION}::foundation-model/amazon.titan-embed-text-v1`,
-                    `arn:aws:bedrock:${cdk.Aws.REGION}::foundation-model/anthropic.claude-3-haiku-20240307-v1:0`],
-            })
+            actions: ['bedrock:InvokeModel'],
+            resources: [`arn:aws:bedrock:${cdk.Aws.REGION}::foundation-model/amazon.titan-embed-text-v1`,
+            `arn:aws:bedrock:${cdk.Aws.REGION}::foundation-model/anthropic.claude-3-haiku-20240307-v1:0`],
+        })
         );
 
 
@@ -129,8 +129,8 @@ export class CdkStack extends cdk.Stack {
         const embeddingFunction = new lambda.DockerImageFunction(this, 'EmbeddingFunction', {
             code: lambda.DockerImageCode.fromEcr(
                 embeddingRepo, {
-                    tagOrDigest: "latest"
-                }
+                tagOrDigest: "latest"
+            }
             ),
             environment: {
                 MATERIALBUCKET: assetBucket.bucketName,
@@ -140,12 +140,14 @@ export class CdkStack extends cdk.Stack {
             role: lambdaRole,
             timeout: cdk.Duration.minutes(15),
             memorySize: 4096,
-            reservedConcurrentExecutions: 1
+            reservedConcurrentExecutions: 1,
+            architecture: getHostArchitecture()
         });
+
         embeddingFunction.node.addDependency(embeddingDeploy);
         embeddingFunction.addEventSource(new SqsEventSource(queue, {
             batchSize: 1,
-            }
+        }
         ))
 
 
@@ -156,7 +158,7 @@ export class CdkStack extends cdk.Stack {
                 entry: 'functions/retrieving',
                 runtime: lambda.Runtime.PYTHON_3_12,
                 architecture: getHostArchitecture(),
-                index: 'main.py', 
+                index: 'main.py',
                 handler: 'lambda_handler',
                 timeout: cdk.Duration.minutes(5),
                 memorySize: 2048,
@@ -167,53 +169,95 @@ export class CdkStack extends cdk.Stack {
                 },
                 role: lambdaRole,
                 layers: [
-                  new pythonlambda.PythonLayerVersion(this, 'layer', {
-                    entry: 'functions/layer',
-                    compatibleRuntimes: [lambda.Runtime.PYTHON_3_12],
-                    // FIXME: 現在実行元マシンによってアーキテクチャを変えているので統一する
-                    compatibleArchitectures: [getHostArchitecture()],
-                    removalPolicy: cdk.RemovalPolicy.DESTROY,
-                    bundling: {
-                        command: [
-                            "bash",
-                             "-c",
-                            "pip install \
+                    new pythonlambda.PythonLayerVersion(this, 'FaissLangChainLayer', {
+                        entry: 'functions/layer',
+                        compatibleRuntimes: [lambda.Runtime.PYTHON_3_12],
+                        // FIXME: 現在実行元マシンによってアーキテクチャを変えているので統一する
+                        compatibleArchitectures: [getHostArchitecture()],
+                        removalPolicy: cdk.RemovalPolicy.DESTROY,
+                        bundling: {
+                            command: [
+                                "bash",
+                                "-c",
+                                "pip install \
                                 --implementation cp \
                                 --python-version 3.12 \
                                 --only-binary=:all: --upgrade \
                                 -r requirements.txt -t /asset-output/python",
-                            'find ./python -name "*.pyc" -delete',
-                            'find ./python -name "*.pyo" -delete',
-                            'find ./python -name "__pycache__" -delete',
-                            'rm -r /asset-output/python/botocore/',
-                            'rm -r /asset-output/python/boto3/',
+                                'find ./python -name "*.pyc" -delete',
+                                'find ./python -name "*.pyo" -delete',
+                                'find ./python -name "__pycache__" -delete',
+                                'rm -r /asset-output/python/botocore/',
+                                'rm -r /asset-output/python/boto3/',
                             ]
-                    }
-                  }),
+                        }
+                    }),
                 ],
-              });
+            });
+
+            const lambdaversionMangeRole = new iam.Role(this, 'LambdaPublishExecutionRole', {
+                assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
+                managedPolicies: [
+                    iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicExecutionRole'),
+                ],
+            });
+            lambdaversionMangeRole.addToPolicy(new iam.PolicyStatement({
+                actions: ['lambda:PublishVersion','lambda:DeleteFunction','lambda:ListVersionsByFunction','lambda:UpdateFunctionConfiguration','lambda:GetFunctionConfiguration'],
+                resources: [searchFunction.functionArn, searchFunction.functionArn+":*"],
+            }));
+
+            const siwtchversionFunction = new pythonlambda.PythonFunction(this, 'PublishVersion', {
+                entry: 'functions/publishversion',
+                runtime: lambda.Runtime.PYTHON_3_12,
+                architecture: getHostArchitecture(),
+                index: 'main.py',
+                handler: 'lambda_handler',
+                timeout: cdk.Duration.minutes(1),
+                memorySize: 128,
+                environment: {
+                    RETRIEVE_FUNCTION: searchFunction.functionName,
+                },
+                role: lambdaversionMangeRole,
+            });
+
+            // index.faiss ファイルの更新通知を受け取り、switchversionFunctionをinvokeする
+            vectorBucket.addEventNotification(
+                s3.EventType.OBJECT_CREATED,
+                new s3n.LambdaDestination(siwtchversionFunction),
+                { prefix: 'index.pkl' }
+            );
+
+            NagSuppressions.addResourceSuppressionsByPath(this,
+                ['/ServerlessRAG/LambdaPublishExecutionRole/DefaultPolicy/Resource']
+                , [
+                    {
+                        id: "AwsSolutions-IAM5",
+                        reason: "These policy only include * in version part.",
+                    },
+                ]);
+
 
         } else {
             const retrievingImageAsset = new ecr_assets.DockerImageAsset(this, 'retrievingImage', {
                 directory: './containers/retrieving',
             });
-    
+
             const retrievingRepo = new ecr.Repository(this, 'retrieving', {
                 emptyOnDelete: true,
                 removalPolicy: cdk.RemovalPolicy.DESTROY,
                 repositoryName: 'retrieving',
             });
-    
+
             const retrievingDeploy = new ecr_deploy.ECRDeployment(this, 'retrievingDockerImage', {
                 src: new ecr_deploy.DockerImageName(retrievingImageAsset.imageUri),
                 dest: new ecr_deploy.DockerImageName(`${cdk.Aws.ACCOUNT_ID}.dkr.ecr.${cdk.Aws.REGION}.amazonaws.com/${retrievingRepo.repositoryName}:latest`),
             })
-    
+
             searchFunction = new lambda.DockerImageFunction(this, 'SearchFunction', {
                 code: lambda.DockerImageCode.fromEcr(
                     retrievingRepo, {
-                        tagOrDigest: "latest"
-                    }
+                    tagOrDigest: "latest"
+                }
                 ),
                 environment: {
                     MATERIALBUCKET: assetBucket.bucketName,
@@ -265,11 +309,13 @@ export class CdkStack extends cdk.Stack {
                 '/ServerlessRAG/BucketNotificationsHandler050a0587b7544547bf325f094a3db834/Role/DefaultPolicy/Resource',
                 '/ServerlessRAG/Custom::CDKECRDeploymentbd07c930edb94112a20f03f096f53666512MiB/ServiceRole/DefaultPolicy/Resource'
             ]
-            ,[
-            { id: "AwsSolutions-IAM5",
-                reason: "These roles are automaticall created by CDK and are used by the Lambda functions.",
-            },
-        ]);
+            , [
+                {
+                    id: "AwsSolutions-IAM5",
+                    reason: "These roles are automaticall created by CDK and are used by the Lambda functions.",
+                },
+            ]);
+
 
         NagSuppressions.addStackSuppressions(
             this,
@@ -278,7 +324,7 @@ export class CdkStack extends cdk.Stack {
                     id: 'AwsSolutions-IAM4',
                     reason: 'These policy are allowd',
                     appliesTo: ['Policy::arn:<AWS::Partition>:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole',
-                    'Policy::arn:<AWS::Partition>:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly'],
+                        'Policy::arn:<AWS::Partition>:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly'],
                 },
             ],
         );
@@ -287,7 +333,8 @@ export class CdkStack extends cdk.Stack {
             [
                 {
                     id: 'AwsSolutions-S1',
-                    reason: 'All buckets are accessed by IAM entity so that they are not public',},
+                    reason: 'All buckets are accessed by IAM entity so that they are not public',
+                },
             ],
         );
         NagSuppressions.addStackSuppressions(
@@ -295,7 +342,8 @@ export class CdkStack extends cdk.Stack {
             [
                 {
                     id: 'AwsSolutions-S10',
-                    reason: 'All buckets are accessed by IAM entity or accessed via cloudfront'},
+                    reason: 'All buckets are accessed by IAM entity or accessed via cloudfront'
+                },
             ],
         );
         NagSuppressions.addStackSuppressions(
@@ -303,7 +351,8 @@ export class CdkStack extends cdk.Stack {
             [
                 {
                     id: 'AwsSolutions-SQS4',
-                    reason: 'All queues are accessed by IAM entity'},
+                    reason: 'All queues are accessed by IAM entity'
+                },
             ],
         );
 
@@ -312,7 +361,8 @@ export class CdkStack extends cdk.Stack {
             [
                 {
                     id: 'AwsSolutions-L1',
-                    reason: 'Temporary disable dis suggestion because we will deal with this for other requests'},
+                    reason: 'Temporary disable dis suggestion because we will deal with this for other requests'
+                },
             ],
         );
 
