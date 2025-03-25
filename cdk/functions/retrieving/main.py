@@ -50,7 +50,7 @@ Question に記述された質問に関連する情報が Text に含まれて�
 A:
 '''
 
-
+# The de-serialization relies loading a pickle file. Pickle files are generated same system and stored restricetd s3 bucket.
 def load_local_to_faiss():
     VECTORSTORE = FAISS.load_local(VECTOR_PATH, embedding, allow_dangerous_deserialization=True)
     return VECTORSTORE
@@ -79,7 +79,7 @@ def init():
 
 
 # init 処理開始
-qa, ntotal = init()
+qa = init()
 
 def lambda_handler(event, context):
     question = event.get("question", "EC2とはなんですか？")
