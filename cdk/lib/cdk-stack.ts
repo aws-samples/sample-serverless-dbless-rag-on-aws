@@ -267,6 +267,7 @@ export class CdkStack extends cdk.Stack {
                 timeout: cdk.Duration.minutes(5),
                 memorySize: 2048
             });
+            searchFunction.node.addDependency(retrievingDeploy);
         }
 
 
