@@ -114,9 +114,9 @@ function MainContent({ signOut, username }: { signOut: () => void; username: str
                         }}
                         items={[
                             { type: "link", text: t("util.routes.home"), href: "/" },
-                            { type: "link", text: t("util.routes.dashboard"), href: "/dashboard" },
                             { type: "link", text: t("util.routes.embedding"), href: "/embedding" },
                             { type: "link", text: t("util.routes.ragchat"), href: "/ragchat" },
+                            { type: "link", text: t("util.routes.dashboard"), href: "/dashboard" },
                         ]}
                     />
                 }

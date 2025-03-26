@@ -159,8 +159,8 @@ export class Frontend {
             resources: ['*'],
         }));
         idpoolAuthRole.addToPolicy(new aws_iam.PolicyStatement({
-            actions: ['lambda:InvokeFunction'],
-            resources: [searchFunctionArn + '*'],
+            actions: ['lambda:InvokeFunction','lambda:ListVersionsByFunction'],
+            resources: [searchFunctionArn + '*', searchFunctionArn],
             sid: "SearchFunction"
         }));
 

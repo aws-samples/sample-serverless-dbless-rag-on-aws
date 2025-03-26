@@ -1,20 +1,21 @@
 import {
   Box,
+  Button,
   Container,
   ContentLayout,
   Header,
+  Icon,
   SpaceBetween, Spinner,
   Table,
   TableProps,
 } from "@cloudscape-design/components";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import {  _Object } from "@aws-sdk/client-s3";
+import { _Object } from "@aws-sdk/client-s3";
 import { useDropzone } from "react-dropzone";
-import { Button } from "@aws-amplify/ui-react";
 import { formatBytes } from '../../commons/util';
 import { listObject, putObject } from '../../commons/aws';
-import {useTranslation} from "react-i18next";
+import { useTranslation } from "react-i18next";
 
 
 export const Home = () => {
@@ -66,7 +67,7 @@ export const Home = () => {
   }
 
   const { getRootProps, getInputProps, isDragActive } =
-    useDropzone({onDrop});
+    useDropzone({ onDrop });
 
   const itemDefinition: TableProps<Item>["columnDefinitions"] = [
     {
@@ -92,13 +93,23 @@ export const Home = () => {
 
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const borderNormalStyle = {
+  const borderNormalStyle: React.CSSProperties = {
     border: "2px dotted #888",
+    height: "300px",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    flexDirection: "column"
   };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const borderDragStyle = {
+  const borderDragStyle: React.CSSProperties = {
     border: "1px solid #00f",
     transition: "border .10s ease-in-out",
+    height: "300px",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    flexDirection: "column"
   };
   const dropAreaStyle = useMemo(
     () => ({
@@ -110,10 +121,10 @@ export const Home = () => {
 
   const files = useMemo(
     () =>
-        myFiles.map((file) => (
-        <li key={file.name}>
+      myFiles.map((file) => (
+        <div key={file.name}>
           {file.name} - {formatBytes(file.size)}
-        </li>
+        </div>
       )),
     [myFiles]
   );
@@ -128,83 +139,96 @@ export const Home = () => {
     >
       <SpaceBetween size="l" direction="vertical">
 
-          <Header variant="h2">{t("pages.embedding.upload")}</Header>
+        <Container>
+          <SpaceBetween size={"l"}>
+            <Header variant="h2">{t("pages.embedding.upload")}</Header>
 
-
-            <div {...getRootProps({ style:dropAreaStyle }) }>
+            <div {...getRootProps({ style: dropAreaStyle })}>
               <input {...getInputProps()} />
-              {isDragActive ? (
-                <p>{t("pages.embedding.drophere")}</p>
+
+              {(files.length == 0) && (<>
+                {isDragActive ? (
+                <p>
+                  {t("pages.embedding.drophere")}
+                  </p>
               ) : (
-                <p>{t("pages.embedding.draganddrop")}</p>
+                <p>
+                  <SpaceBetween size={"xl"} alignItems="center">
+                  <Icon variant="disabled" name="upload" size="large"/>
+                  {t("pages.embedding.draganddrop")}
+                  </SpaceBetween>
+                  </p>
               )}
-              <ul>{files} </ul>
-              {isUploading ? <Spinner />:null}
+              </>)}
+
+              <ul>{files}</ul>
+              {isUploading ? <Spinner /> : null}
             </div>
 
-          <Box textAlign={"right"}>
-            <Button variation={"primary"} onClick={() => {handleUpload()}} disabled={isUploading}>
-              {t("pages.embedding.upload")}
-            </Button>
-          </Box>
+            <Box textAlign={"right"}>
+              <Button onClick={() => { handleUpload() }} disabled={isUploading}>
+                {t("pages.embedding.upload")}
+              </Button>
+            </Box>
+          </SpaceBetween>
+        </Container>
 
-
-          <Container>
-            <Header
-              counter={
-                "(" +
-                  assetBucketObjects.length +
-                ")     " +
-                formatBytes(
-                    assetBucketObjects.reduce((accumulator, currentItem) => {
-                    return accumulator + currentItem.Size!;
-                  }, 0)
-                )
-              }
-            >
-              {t("pages.embedding.uploaded")}
-            </Header>
-            <Table
-              enableKeyboardNavigation={true}
-              variant="borderless"
-              resizableColumns={true}
-              items={assetBucketObjects.slice(0, 10).map((_object) => ({
-                name: _object.Key!,
-                size: formatBytes(_object.Size!), // Size を文字列に変換 (例: "1024 bytes")
-                date: new Date(_object.LastModified!).toLocaleString('en-US', {
-                  year: 'numeric',
-                  month: '2-digit',
-                  day: '2-digit',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  second: '2-digit',
-                }),
-              }))}
-              columnDefinitions={itemDefinition}
-            />
-          </Container>
+        <Container>
+          <Header
+            counter={
+              "(" +
+              assetBucketObjects.length +
+              ")     " +
+              formatBytes(
+                assetBucketObjects.reduce((accumulator, currentItem) => {
+                  return accumulator + currentItem.Size!;
+                }, 0)
+              )
+            }
+          >
+            {t("pages.embedding.uploaded")}
+          </Header>
+          <Table
+            enableKeyboardNavigation={true}
+            variant="borderless"
+            resizableColumns={true}
+            items={assetBucketObjects.slice(0, 10).map((_object) => ({
+              name: _object.Key!,
+              size: formatBytes(_object.Size!), // Size を文字列に変換 (例: "1024 bytes")
+              date: new Date(_object.LastModified!).toLocaleString('en-US', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+              }),
+            }))}
+            columnDefinitions={itemDefinition}
+          />
+        </Container>
 
         <Container>
           <Header>
             {t("pages.embedding.embeddedindex")}
           </Header>
           <Table
-              enableKeyboardNavigation={true}
-              variant="borderless"
-              resizableColumns={true}
-              items={vectorBucketObjects.slice(0, 10).map((_object) => ({
-                name: _object.Key!,
-                size: formatBytes(_object.Size!), // Size を文字列に変換 (例: "1024 bytes")
-                date: new Date(_object.LastModified!).toLocaleString('en-US', {
-                  year: 'numeric',
-                  month: '2-digit',
-                  day: '2-digit',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  second: '2-digit',
-                }),
-              }))}
-              columnDefinitions={itemDefinition}
+            enableKeyboardNavigation={true}
+            variant="borderless"
+            resizableColumns={true}
+            items={vectorBucketObjects.slice(0, 10).map((_object) => ({
+              name: _object.Key!,
+              size: formatBytes(_object.Size!), // Size を文字列に変換 (例: "1024 bytes")
+              date: new Date(_object.LastModified!).toLocaleString('en-US', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+              }),
+            }))}
+            columnDefinitions={itemDefinition}
           />
         </Container>
 

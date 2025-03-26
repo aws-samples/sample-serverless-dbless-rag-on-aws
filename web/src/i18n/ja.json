@@ -1,7 +1,7 @@
 {
   "util": {
     "navbar": {
-      "title": "Serverless RAG コンソール",
+      "title": "Serverless DBless RAG コンソール",
       "lang": "Language(日本語)",
       "logout": "ログアウト"
     },
@@ -14,7 +14,7 @@
   },
   "pages" :{
     "home" : {
-      "title": "Serverless RAG コンソール",
+      "title": "Serverless DBless RAG コンソール",
       "description": "このアプリケーションは、デプロイした RAG へのドキュメントの投入とチャットを行うためのコンソールです。",
       "quickstart": {
         "title": "クイックスタート",
@@ -25,7 +25,9 @@
         "step2": "資料を S3 バケットに配置すると、埋め込みが自動で始まるので待ちます。",
         "step2failure": "埋め込みがまだ完了していません",
         "step2success": "埋め込みが完了しました",
-        "step3": "こちらでチャットができます。"
+        "step3": "埋め込みファイルが S3 にアップロードされたあと、検索が可能になります。",
+        "step3success": "こちらでチャットができます。",
+        "links": "リンク集"
       },
       "architecture": "アーキテクチャ"
     },

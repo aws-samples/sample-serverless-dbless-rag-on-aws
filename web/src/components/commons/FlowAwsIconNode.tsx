@@ -3,21 +3,45 @@ import {memo} from "react";
 
 interface DataProps {
     color: string;
-    onChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+    onChange?: (event: React.ChangeEvent<HTMLInputElement>) => void;
     image: string,
     label: string,
-    value: string
+    value?: string,
+    style?: React.CSSProperties,
+    overlayIcon?: string
 }
 
 const FlowAwsIconNode: React.FC<{ data: DataProps }> = ({data}) => {
     return (
         <>
-            <div style={{display: "flex", flexDirection: "column", alignItems: "center"}}>
+            <div 
+                style={{
+                    display: "flex", 
+                    flexDirection: "column", 
+                    alignItems: "center", 
+                    position: 'relative',
+                    ...data.style
+                }}
+            >
+                {data.overlayIcon && (
+                    <img 
+                        src={data.overlayIcon} 
+                        alt="Overlay Icon" 
+                        style={{
+                            position: 'absolute', 
+                            top: '8px', 
+                            left: '8px', 
+                            width: '24px', 
+                            height: '24px', 
+                            zIndex: 1
+                        }} 
+                    />
+                )}
                 <div>
                     <img src={data.image} alt={"icon"}/>
                 </div>
                 <div>{data.label}</div>
-                <div>{data.value}</div>
+                {data.value && <div>{data.value}</div>}
             </div>
 
             <Handle
