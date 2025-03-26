@@ -1,6 +1,6 @@
 import {fetchAuthSession} from "aws-amplify/auth";
 import {CloudWatchClient, GetMetricDataCommand} from "@aws-sdk/client-cloudwatch";
-import {InvokeCommand, LambdaClient} from "@aws-sdk/client-lambda";
+import {InvokeCommand, LambdaClient, ListVersionsByFunctionCommand} from "@aws-sdk/client-lambda";
 import {ListObjectsV2Command, PutObjectCommand, S3Client} from "@aws-sdk/client-s3";
 import {CloudWatchLogsClient, DescribeLogStreamsCommand} from "@aws-sdk/client-cloudwatch-logs";
 
@@ -132,8 +132,24 @@ export const invokeSearchLambda = async (questionString: string) => {
             credentials: credential,
         });
 
+        const functionName = import.meta.env.VITE_APP_SEARCH_FUNCTION_NAME ?? import.meta.env.VITE_LOCAL_SEARCH_FUNCTION_NAME;
+
+        // バージョンを取得
+        const listVersionsCommand = new ListVersionsByFunctionCommand({ FunctionName: functionName });
+        const versionsResponse = await client.send(listVersionsCommand);
+
+        // "$LATEST" を除外し、数値的に最新のバージョンを選択
+        const latestVersion = versionsResponse.Versions
+        ?.filter(v => v.Version !== '$LATEST')
+        .map(v => parseInt(v.Version || '0'))
+        .reduce((max, current) => Math.max(max, current), 0) || 0;
+    
+        // 最新バージョンが存在する場合は、そのバージョンを使用
+        const functionNamewithVersion = latestVersion > 0 ? `${functionName}:${latestVersion}` : functionName;
+        
+
         const command = new InvokeCommand({
-            FunctionName: import.meta.env.VITE_APP_SEARCH_FUNCTION_NAME ?? import.meta.env.VITE_LOCAL_SEARCH_FUNCTION_NAME,
+            FunctionName: functionNamewithVersion,
             Payload:
             JSON.stringify({question: questionString}),
         });

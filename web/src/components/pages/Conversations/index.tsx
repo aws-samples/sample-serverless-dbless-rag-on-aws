@@ -92,19 +92,22 @@ export const Home = () => {
                 {isLoading ? <LoadingBar variant="gen-ai-masked"/> : null}
             </SpaceBetween>
 
-            <div style={{marginTop: "100px"}}></div>
+            <div style={{marginTop: "200px"}}></div>
 
             {/*質問用フォームを画面したに表示*/}
             <div
                 style={{
                     top: "auto",
-                    bottom: 20,
+                    bottom: 60,
                     position: "fixed",
-                    right: 20,
-                    left: 300,
+                    right: 40,
+                    left: 340,
                     textAlign: "right",
+                    display: "flex",      // これを追加
+                    justifyContent: "center"  // これを追加
                 }}
             >
+                <div style={{width:"80%"}}>
                 <SpaceBetween size="xs">
                     <Textarea
                         onChange={({detail}) => setValue(detail.value)}
@@ -115,10 +118,10 @@ export const Home = () => {
                         {t("pages.ragchat.ask")}
                     </Button>
                 </SpaceBetween>
+                </div>
             </div>
 
 
-            <div ref={scrollBottomRef}/>
         </ContentLayout>
     );
 };

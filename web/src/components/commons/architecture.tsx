@@ -4,7 +4,9 @@ import S3Icon from '../../assets/Arch_Amazon-Simple-Storage-Service_48.png'
 import LambdaIcon from '../../assets/Arch_AWS-Lambda_48.png'
 import SqsIcon from '../../assets/Arch_Amazon-Simple-Queue-Service_48.png'
 import BedrockIcon from '../../assets/Arch_Amazon-Bedrock_48.png'
+import CloudWatchIcon from '../../assets/Arch_Amazon-CloudWatch_48.png'
 import UserIcon from '../../assets/Res_User_48_Light.png'
+import UsersIcon from '../../assets/Res_Users_48_Light.png'
 import CloudIcon from '../../assets/AWS-Cloud-logo_32.png'
 import AwsIconNode from './FlowAwsIconNode';
 import './reactflow.css';
@@ -22,7 +24,7 @@ const nodeTypes = {
 };
 
 // Architectureコンポーネント
-const Architecture: React.FC<ArchitectureProps> = ({ title = 'システムアーキテクチャ' }) => {
+const Architecture: React.FC<ArchitectureProps> = ({ title = '' }) => {
 
     const initialNodes = [
         {
@@ -104,7 +106,7 @@ const Architecture: React.FC<ArchitectureProps> = ({ title = 'システムアー
             id: "7",
             type: "awsNode",
             position: { x: 950, y: 250 },
-            data: { color: '#1A192B', image: UserIcon, label: "End User" },
+            data: { color: '#1A192B', image: UsersIcon, label: "End Users" },
         },
         {
             id: "9",
@@ -117,6 +119,12 @@ const Architecture: React.FC<ArchitectureProps> = ({ title = 'システムアー
             type: "awsNode",
             position: { x: 544, y: 390 },
             data: { color: '#1A192B', image: LambdaIcon, label: "Lambda" },
+        },
+        {
+            id: "11",
+            type: "awsNode",
+            position: { x: 240, y: 510 },
+            data: { color: '#1A192B', image: CloudWatchIcon, label: "CloudWatch Metrics" },
         },
 
     ];
@@ -217,6 +225,16 @@ const Architecture: React.FC<ArchitectureProps> = ({ title = 'システムアー
             sourceHandle: "r",
             targetHandle: "l",
             label: 'Publish new version',
+            labelShowBg: false
+        },
+        {
+            id: "e2-11",
+            source: "2",
+            target: "11",
+            markerEnd: { type: MarkerType.Arrow, width: 20, height: 20, color: "#000000" },
+            sourceHandle: "b",
+            targetHandle: "t",
+            label: 'Push metrics',
             labelShowBg: false
         }
     ];

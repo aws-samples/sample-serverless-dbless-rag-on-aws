@@ -89,27 +89,35 @@ export const Home = (props: Props) => {
                     <p>
                         {t("pages.home.quickstart.step2")}<br></br>
                         {step_2_status ?
-                            <div><StatusIndicator type="success">{t("pages.home.quickstart.step2success")}</StatusIndicator> <p>
-                                <Link href={"/ragchat"}
-                                    onFollow={(event) => {
-                                        event.preventDefault();
-                                        if (!event.detail.external) {
-                                            props.setActiveHref(event.detail.href ?? "/");
-                                            props.navigate(event.detail.href ?? "/");
-                                        }
-                                    }}
-                                >{t("pages.home.quickstart.step3")}</Link><br></br></p>
-                            </div>
+                            <div><StatusIndicator type="success">{t("pages.home.quickstart.step2success")}</StatusIndicator> </div>
                             : <StatusIndicator type="info">{t("pages.home.quickstart.step2failure")}</StatusIndicator>
                         }
+                    </p>
+
+                    <p>
+                        {t("pages.home.quickstart.step3")}<br></br>
+                        {step_2_status ? <div>
+                            <StatusIndicator type="success"></StatusIndicator><Link href={"/ragchat"}
+                                onFollow={(event) => {
+                                    event.preventDefault();
+                                    if (!event.detail.external) {
+                                        props.setActiveHref(event.detail.href ?? "/");
+                                        props.navigate(event.detail.href ?? "/");
+                                    }
+                                }}
+                            >{t("pages.home.quickstart.step3success")}</Link>
+                        </div> : <div></div>
+                        }
+
                     </p>
 
                 </ul>
             </Container>
 
             <Container>
-                <Architecture title={t("pages.home.architecture")}></Architecture>
-            </Container>
+            <Header variant="h3">{t("pages.home.architecture")}</Header>
+                <Architecture></Architecture>
+            </Container> 
 
             <Container>
                 <Header variant="h3">{t("pages.home.quickstart.links")}</Header>
