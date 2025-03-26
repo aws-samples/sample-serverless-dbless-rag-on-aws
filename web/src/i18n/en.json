@@ -25,7 +25,8 @@
         "step2": "Once you place the documents in the S3 bucket, the embedding process will start automatically, so please wait.",
         "step2failure": "The embedding process is not complete yet",
         "step2success": "The embedding process is complete",
-        "step3": "You can chat here."
+        "step3": "You can chat here.",
+        "links": "Links"
       },
       "architecture": "Architecture"
     },
