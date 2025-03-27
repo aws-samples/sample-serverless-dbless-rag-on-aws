@@ -1,51 +1,49 @@
-# Serverless RAG
+# Serverless dbless RAG
 サーバーレスRAGは、AWSでの検索拡張生成（RAG）の実装です。
 このソリューションは、AWS CDK リソースと React プロジェクトで構成されています。
 アーキテクチャは主にサーバーレスのイベント駆動型AWSサービスで構成されており、低コストでユーザーにRAGエクスペリエンスを提供します。
+
+## デモ
+https://github.com/user-attachments/assets/85d91786-e1af-4a48-8d56-2130dbf60fdf
 
 ## ソリューションのデプロイ
 ### 前提条件
 - AWS CDK
 - Docker
 - Node.JS
-- AWSアカウントで以下のモデルアクセスを有効にする
+- AWSアカウントで以下のモデルアクセスを事前に[有効にする](https://docs.aws.amazon.com/ja_jp/bedrock/latest/userguide/model-access-modify.html)こと
     - Amazon Titan Embed Text V1
     - Claude 3 Haiku
 
 
-## クイックスタート
-以下コマンドを実行することで Serverless RAG を開始することができます
+###  クイックスタート
+以下コマンドを実行することで DBless Serverless RAG を開始することができます
 ```bash
-git clone <this repository>
-cd <Project Directory>
+git clone git@github.com:aws-samples/sample-serverless-dbless-rag-on-aws.git
+cd sample-serverless-dbless-rag-on-aws
 cd cdk
 npm install
 cdk deploy --context createFrontend=true --context generateInitialUser=true --context enableSnapStart=true
 ```
 
-## Lambda SnapStart の有効化
+デプロイされた CloudFront の URL にアクセスし、デプロイ時に出力された ユーザー名と初期パスワードでログインできます。
+GUI でドキュメント(PDF)のアップロードを行うと、SQSを介してLambdaが埋め込みジョブを自動で順次処理します。
+埋め込みが完了した後は、GUI から埋め込んだドキュメントの内容に関して QA ができます。
+
+### Lambda SnapStart の有効化/無効化
 以下オプションを設定することで、Lambda SnapStart を有効化しコールドスタートの影響を抑えることで UX を向上することができます
-You can deploiy with lambda snapstart option to decrease cold start for improving user experience
 ```bash
 cdk deploy --context enableSnapStart=true
 ```
 
-### フロントエンドを含める場合のデプロイ
-`createFrontend`コンテキストをtrueに設定することで、フロントエンドを含めてデプロイできます。
+### フロントエンドを含める/含めない場合のデプロイ
+`createFrontend`コンテキストを true に設定することで、フロントエンドを含めてデプロイできます。
 ```bash
-git clone <this repository>
-cd <Project Directory>
-cd cdk
-npm install
 cdk deploy --context createFrontend=true
 ```
 
-また、`generateInitialUser`コンテキストをtrueに設定することで、フロントエンドの初期ユーザーを設定できます。
+`createFrontend`コンテキストが true の場合、`generateInitialUser`コンテキストをtrueに設定することで、フロントエンドの初期ユーザーを設定できます。
 ```bash
-git clone <this repository>
-cd <Project Directory>
-cd cdk
-npm install
 cdk deploy --context createFrontend=true --context generateInitialUser=true
 ```
 
@@ -53,14 +51,8 @@ cdk deploy --context createFrontend=true --context generateInitialUser=true
 
 ### フロントエンドを含めない場合のデプロイ
 ```bash
-git clone <this repository>
-cd <Project Directory>
-cd cdk
-npm install
 cdk deploy
 ```
-
-S3バケットにドキュメントを配置すると、S3キューSQSを介してLambdaが埋め込みジョブを順次処理します。
 
 以下のように手動でLambda関数を呼び出すことができます。
 ```bash
@@ -70,10 +62,9 @@ aws lambda invoke --function-name <Function Name> \
 ```
 
 
-
 ## 予想コスト
 このソリューションを ap-northeast-1 リージョンにデプロイした場合の見積もりコストは以下の通りです。
-> 注：小さなコスト項目は以下の表から除外されています。
+> 注：小さなコスト項目やGUIのコストは以下の表から除外されています。
 
 ### 質問応答 1000 回分のコスト
 | サービス               |                          項目 |            量 | コスト (USD) |
