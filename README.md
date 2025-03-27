@@ -1,4 +1,4 @@
-# Serverless RAG
+# Serverless dbless RAG
 Serverless RAG is an implementation of Retrieval Augumented Generation (RAG) on AWS.
 This solution is composed of AWS CDK resources and React project.
 Architecture is mainly composed of serverless, event-driven AWS services to deliver RAG experience for uses with low costs.
@@ -6,69 +6,60 @@ Architecture is mainly composed of serverless, event-driven AWS services to deli
 日本語の説明はこちら
 [日本語](./README.ja.md)
 
+## Demo
+https://github.com/user-attachments/assets/85d91786-e1af-4a48-8d56-2130dbf60fdf
+
 ## Architecture
 ![Architecture](./architecture/architecture.png "architecture")
 
-## Getting Started
+## Deploying the Solution
 ### Prerequisites
 - AWS CDK
 - Docker
 - Node.JS
-- Enable following model access on AWS Account
+- [Enable](https://docs.aws.amazon.com/bedrock/latest/userguide/model-access-modify.html) the following model access on your AWS Account:
     - Amazon Titan Embed Text V1
     - Claude 3 Haiku
 
-## QuickStart
-You can deploy using following commands.
+### QuickStart
+You can start the DBless Serverless RAG by executing the following commands:
 ```bash
-git clone <this repository>
-cd <Project Directory>
+git clone git@github.com:aws-samples/sample-serverless-dbless-rag-on-aws.git
+cd sample-serverless-dbless-rag-on-aws
 cd cdk
 npm install
 cdk deploy --context createFrontend=true --context generateInitialUser=true --context enableSnapStart=true
 ```
 
-## Enable Lambda SnapStart
-You can deploiy with lambda snapstart option to decrease cold start for improving user experience
+You can access the deployed CloudFront URL and log in using the username and initial password output during deployment.
+When you upload documents (PDF) through the GUI, Lambda will automatically process the embedding jobs sequentially via SQS.
+After the embedding is complete, you can perform Q&A on the content of the embedded documents through the GUI.
+
+### Enabling/Disabling Lambda SnapStart
+You can enable Lambda SnapStart to improve UX by reducing the impact of cold starts with the following option:
 ```bash
 cdk deploy --context enableSnapStart=true
 ```
 
-
-## Deploy with Frontend
-You can deploy with frontend by setting `createFrontend` context to true.
+### Deploying with/without Frontend
+You can deploy including the frontend by setting the `createFrontend` context to true:
 ```bash
-git clone <this repository>
-cd <Project Directory>
-cd cdk
-npm install
 cdk deploy --context createFrontend=true
 ```
 
-In addition, you can set up initial user for frontend by setting `generateInitialUser` context to true.
+When the `createFrontend` context is true, you can set up the initial user for the frontend by setting the `generateInitialUser` context to true:
 ```bash
-git clone <this repository>
-cd <Project Directory>
-cd cdk
-npm install
 cdk deploy --context createFrontend=true --context generateInitialUser=true
 ```
 
-You can access the document embedding and search functionality through a GUI by accessing the deployed CloudFront URL.
+You can access the GUI for document embedding and search by accessing the deployed CloudFront URL.
 
-## Deploy without Frontend
-
+### Deploying without Frontend
 ```bash
-git clone <this repository>
-cd <Project Directory>
-cd cdk
-npm install
 cdk deploy
 ```
 
-When you put your documents on S3 bucket, S3 qneueue SQS and then Lambda process embedding jobs sequentially.
-
-You can manually invoke Lambda Function as follows.
+You can manually invoke the Lambda function as follows:
 ```bash
 aws lambda invoke --function-name <Function Name> \
 --cli-binary-format raw-in-base64-out \
@@ -78,40 +69,39 @@ aws lambda invoke --function-name <Function Name> \
 
 
 ## Estimated Costs
-Estimated costs when this solution is deployed in ap-northeast-1 region are as follows.
-> Note: Minor cost items are excluded from the table below.
+Estimated costs when this solution is deployed in the ap-northeast-1 region are as follows.
+> Note: Minor cost items and GUI costs are excluded from the table below.
 
-### 1000 Question answering with RAG costs
-
-| Service               |                                      Item | Total volume | Cost (USD) |
-|-----------------------|------------------------------------------:|-------------:|-----------:|
-| Lambda(x86, 2GB)      |                         GB-Duration (sec) |     2 * 1000 |    0.03333 |
-| Lambda                |                        Number of requests |         1000 |     0.0002 |
-| Bedrock               |     Claude 3 Haiku Number of input tokens |  1000 * 1000 |       0.25 |
-| Bedrock               |     Claude 3 Haiku Number of output token |   300 * 1000 |      0.375 |
-| Total estimated cost  |                                         - |            - |    0.65373 |
-
-
-### 1 MB documents Embedding costs
-
-| Service               |                                       Item | Total volume | Cost (USD) |
-|-----------------------|-------------------------------------------:|-------------:|-----------:|
-| Lambda(x86, 4GB)      |                          GB-Duration (sec) |       4 * 20 |     0.0133 |
-| Bedrock               |  Amazon Titan Text Embeddings Number of input token amounts | 30000 |  0.006 |
-| Total estimated cost	|                                          - |            - |     0.0143 |
+### Cost for 1000 Question Answering sessions
+| Service               |                          Item |            Quantity | Cost (USD) |
+|-----------------------|------------------------------:|--------------------:|-----------:|
+| Lambda(x86, 2GB)      |              GB-Duration (sec)|           2 * 1000 |    0.03333 |
+| Lambda                |            Number of requests|                1000 |     0.0002 |
+| Bedrock               |  Claude 3 Haiku, input tokens|          1000 * 1000 |       0.25 |
+| Bedrock               |  Claude 3 Haiku, output tokens|           300 * 1000 |      0.375 |
+| Total estimated cost  |                            - |                    - |    0.65373 |
 
 
-### Monthly storage costs
+### Cost for Embedding 1 MB of documents
+| Service                |                                       Item |              Quantity | Cost (USD) |
+|------------------------|------------------------------------------:|--------------------:|-----------:|
+| Lambda(x86, 4GB)       |                           GB-Duration (sec) |               4 * 20 |     0.0133 |
+| Bedrock                | Amazon Titan Text Embeddings, input tokens |              30000 |      0.006 |
+| Total estimated cost	 |                                         - |                   - |     0.0143 |
 
-| Service                |                                  Item | Total volume |         Cost (USD) |
-|------------------------|--------------------------------------:|-------------:|-------------------:|
-| ECR                    |                        Image size(GB) |            1 |                0.1 |
-| S3                     |                            Assets(GB) |            1 |              0.025 |
 
-Notes:
-- The costs presented are for reference purposes only, as actual costs will vary based on the embedded content and search usage.
-- AWS provides a Free Tier offering for select services. These calculations do not include Free Tier benefits; therefore, actual costs may be lower than the estimated amounts shown.
-- This cost estimation is based on pricing in the AWS Asia Pacific (Tokyo) Region. In the event of any discrepancy between the prices shown herein and those published on the official AWS website, the pricing on the official AWS website shall prevail.
+### Monthly Storage Costs
+
+| Service                |                                  Item |  Quantity |         Cost (USD) |
+|------------------------|--------------------------------------:|----------:|-------------------:|
+| ECR                    |                      Image size (GB) |         1 |                0.1 |
+| S3                     |                       Assets size(GB) |         1 |              0.025 |
+
+
+Notes: 
+- The actual costs may vary depending on the documents being embedded and the search content. This information is provided for reference only.
+- Some AWS services offer a free tier. This calculation does not take into account the free tier, so you may be able to use the services at a lower cost in practice.
+- This calculation is based on the pricing in the Tokyo region. While we strive to keep this information up-to-date, if there is any discrepancy between the prices listed here and those on the official AWS website, the prices on the official AWS website take precedence.
 
 
 ## Security
@@ -119,4 +109,3 @@ See [CONTRIBUTING](./CONTRIBUTING.md) for more information.
 
 ## License
 This library is licensed under the MIT-0 License. See the [LICENSE](./LICENSE) file.
-
