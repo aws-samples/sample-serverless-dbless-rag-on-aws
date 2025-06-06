@@ -5,6 +5,7 @@ import {
   ContentLayout,
   Header,
   Icon,
+  Modal,
   SpaceBetween, Spinner,
   Table,
   TableProps,
@@ -14,8 +15,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { _Object } from "@aws-sdk/client-s3";
 import { useDropzone } from "react-dropzone";
 import { formatBytes } from '../../commons/util';
-import { listObject, putObject } from '../../commons/aws';
+import { getLogEvents, listLogStreams, listObject, putObject } from '../../commons/aws';
 import { useTranslation } from "react-i18next";
+import { LogEvent, LogStream } from "@aws-sdk/client-cloudwatch-logs";
 
 
 export const Home = () => {
@@ -25,7 +27,12 @@ export const Home = () => {
   const embeddingBucketName = import.meta.env.VITE_APP_EMBEDDINGS_ASSET_BUCKET_NAME ?? import.meta.env.VITE_LOCAL_MATERIAL_BUCKET_NAME;
   const vectorBucketName = import.meta.env.VITE_APP_VECTOR_BUCKET_NAME ?? import.meta.env.VITE_LOCAL_VECTOR_BUCKET_NAME;
   const [isUploading, setIsUploading] = useState(false); // ローディング状態を管理
-
+  
+  const embeddingFunctionName = import.meta.env.VITE_EMBEDDING_FUNCTION_NAME ?? import.meta.env.VITE_LOCAL_EMBEDDING_FUNCTION_NAME;
+  const [lambdaExecuteLogStreams, setLambdaExecuteLogStreams] = useState<LogStream[]>([]); // APIからの結果を保持する状態
+  const [selectedLogStream, setSelectedLogStream] = useState<string | null>(null); // 選択されたログストリーム
+  const [logEvents, setLogEvents] = useState<LogEvent[]>([]); // ログイベントを保持する状態
+  const [isLogModalVisible, setIsLogModalVisible] = useState(false); // ログモーダルの表示状態
 
   const handleUpload = async () => {
     setIsUploading(true);
@@ -53,10 +60,23 @@ export const Home = () => {
     listObject(embeddingBucketName).then(setEmbeddingBucketObjects).catch(console.error);
     listObject(vectorBucketName).then(setVectorBucketObjects).catch(console.error);
   };
+  
+  // ログストリームをクリックした際の処理
+  const handleLogStreamClick = async (logStreamName: string) => {
+    setSelectedLogStream(logStreamName);
+    try {
+      const events = await getLogEvents(`/aws/lambda/${embeddingFunctionName}`, logStreamName);
+      setLogEvents(events);
+      setIsLogModalVisible(true);
+    } catch (error) {
+      console.error("Error fetching log events:", error);
+    }
+  };
 
   useEffect(() => {
     listObject(embeddingBucketName).then(setEmbeddingBucketObjects).catch(console.error);
     listObject(vectorBucketName).then(setVectorBucketObjects).catch(console.error);
+    listLogStreams("/aws/lambda/"+embeddingFunctionName).then(setLambdaExecuteLogStreams).catch(console.error)
     init();
   }, []);
 
@@ -231,9 +251,75 @@ export const Home = () => {
             columnDefinitions={itemDefinition}
           />
         </Container>
+        
+        <Container>
+          <Header>
+            取り込み中ログ
+          </Header>
+          <Table
+            enableKeyboardNavigation={true}
+            variant="borderless"
+            resizableColumns={true}
+            onRowClick={({ detail }) => {
+              if (detail.item.logStreamName) {
+                handleLogStreamClick(detail.item.logStreamName);
+              }
+            }}
+            columnDefinitions={[
+              {
+                id: "logStreamName",
+                header: "ログストリーム名",
+                cell: item => item.logStreamName || "-",
+                width: 341,
+              },
+              {
+                id: "creationTime",
+                header: "作成時刻",
+                cell: item => item.creationTime ? new Date(item.creationTime).toLocaleString('ja-JP') : "-",
+                width: 164,
+              },
+              {
+                id: "lastIngestionTime",
+                header: "最終取り込み時刻",
+                cell: item => item.lastIngestionTime ? new Date(item.lastIngestionTime).toLocaleString('ja-JP') : "-",
+                width: 164,
+              },
+            ]} 
+            items={lambdaExecuteLogStreams.slice(0, 10)}
+          />
+        </Container>
 
 
       </SpaceBetween>
+
+      {/* ログイベント表示用モーダル */}
+      <Modal
+        visible={isLogModalVisible}
+        onDismiss={() => setIsLogModalVisible(false)}
+        header={`ログストリーム: ${selectedLogStream || ""}`}
+        size="large"
+      >
+        <Table
+          enableKeyboardNavigation={true}
+          variant="borderless"
+          resizableColumns={true}
+          columnDefinitions={[
+            {
+              id: "timestamp",
+              header: "タイムスタンプ",
+              cell: item => item.timestamp ? new Date(item.timestamp).toLocaleString('ja-JP') : "-",
+              width: 200,
+            },
+            {
+              id: "message",
+              header: "メッセージ",
+              cell: item => item.message || "-",
+              width: 600,
+            },
+          ]}
+          items={logEvents}
+        />
+      </Modal>
     </ContentLayout>
   );
 };

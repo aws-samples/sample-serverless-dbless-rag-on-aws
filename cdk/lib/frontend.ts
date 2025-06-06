@@ -22,6 +22,8 @@ export class Frontend {
                 searchFunctionArn: string,
                 searchFunctionName: string,
                 generateInitialUser: boolean,
+                embeddingresultLogGroup: cdk.aws_logs.ILogGroup,
+                embeddingFunctionName: string
                 ) {
 
         //  ==  == == ==  ==  ==  ==  == Front Assets ==  ==  ==  ==  ==  ==  ==  ==
@@ -140,6 +142,7 @@ export class Frontend {
         });
         idpool.applyRemovalPolicy(cdk.RemovalPolicy.DESTROY);
 
+        // Frontend User Role definition
         const idpoolAuthRole = new aws_iam.Role(scope, 'web-idpool-auth-role', {
             assumedBy: new aws_iam.FederatedPrincipal(
                 'cognito-identity.amazonaws.com', {
@@ -159,10 +162,19 @@ export class Frontend {
             resources: ['*'],
         }));
         idpoolAuthRole.addToPolicy(new aws_iam.PolicyStatement({
-            actions: ['lambda:InvokeFunction','lambda:ListVersionsByFunction'],
+            actions: ['lambda:InvokeFunction','lambda:ListVersionsByFunction', 'lambda:ListVersionsByFunction'],
             resources: [searchFunctionArn + '*', searchFunctionArn],
             sid: "SearchFunction"
         }));
+
+        idpoolAuthRole.addToPolicy(new aws_iam.PolicyStatement({
+            actions: ['logs:PutLogEvents','logs:DescribeLogStreams','logs:GetLogEvents'],
+            resources: [embeddingresultLogGroup.logGroupArn, embeddingresultLogGroup.logGroupArn+':*'],
+            sid: "lambdaExecuteLogs"
+        }));
+
+
+
 
 
         const idpoolAuthRoleAttachment = new cognito.CfnIdentityPoolRoleAttachment(scope, 'web-idpool-auth-role-attachment', {
@@ -173,6 +185,7 @@ export class Frontend {
         });
 
 
+        
         new NodejsBuild(scope, 'FrontendAsset', {
             assets: [
                 {
@@ -215,6 +228,7 @@ export class Frontend {
                 VITE_APP_AWS_REGION: cdk.Aws.REGION,
                 VITE_APP_EMBEDDINGS_ASSET_QUEUE_NAME: embeddingQueueName,
                 VITE_APP_SEARCH_FUNCTION_NAME: searchFunctionName,
+                VITE_EMBEDDING_FUNCTION_NAME: embeddingFunctionName
             },
         });
 
@@ -230,6 +244,14 @@ export class Frontend {
             reason: 'In this pj, nodejs version 20 is used for deploy-time-build'
             }
         ]);
+
+        NagSuppressions.addStackSuppressions(scope, [
+            {
+            id: 'AwsSolutions-IAM5', 
+            reason: 'In this prj, asterisk is used for partiary match'
+            }
+        ]);
+        
   
 
         NagSuppressions.addResourceSuppressionsByPath(scope,

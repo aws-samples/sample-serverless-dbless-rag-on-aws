@@ -2,28 +2,7 @@ import {fetchAuthSession} from "aws-amplify/auth";
 import {CloudWatchClient, GetMetricDataCommand} from "@aws-sdk/client-cloudwatch";
 import {InvokeCommand, LambdaClient, ListVersionsByFunctionCommand} from "@aws-sdk/client-lambda";
 import {ListObjectsV2Command, PutObjectCommand, S3Client} from "@aws-sdk/client-s3";
-import {CloudWatchLogsClient, DescribeLogStreamsCommand} from "@aws-sdk/client-cloudwatch-logs";
-
-export const listLogStreams = async (logGroupName: string) => {
-    try {
-        const credential = (await fetchAuthSession()).credentials;
-        const client = new CloudWatchLogsClient({
-            region: import.meta.env.VITE_APP_AWS_REGION ?? import.meta.env.VITE_LOCAL_AWS_REGION,
-            credentials: credential,
-        });
-
-        const command = new DescribeLogStreamsCommand({
-            logGroupName: logGroupName,
-        });
-
-        const response = await client.send(command);
-        const logStreams = response.logStreams || [];
-        return logStreams.map(stream => stream.logStreamName);
-    } catch (error) {
-        console.error("Error fetching log streams:", error);
-        throw error;
-    }
-};
+import {CloudWatchLogsClient, DescribeLogStreamsCommand, GetLogEventsCommand} from "@aws-sdk/client-cloudwatch-logs";
 
 
 export const putObject = async (bucket:string, keys:File[]) => {
@@ -164,5 +143,53 @@ export const invokeSearchLambda = async (questionString: string) => {
             result: error.message,
             references: [],
         }
+    }
+};
+
+// Lambda 関数の実行ログからまずはストリームを列挙する関数
+export const listLogStreams = async (logGroupName: string) => {
+    try {
+        const credential = (await fetchAuthSession()).credentials;
+        const client = new CloudWatchLogsClient({
+            region: import.meta.env.VITE_APP_AWS_REGION ?? import.meta.env.VITE_LOCAL_AWS_REGION,
+            credentials: credential,
+        });
+
+        const command = new DescribeLogStreamsCommand({
+                logGroupName: logGroupName,
+                orderBy: "LastEventTime",
+        });
+
+        const response = await client.send(command);
+        const logStreams = response.logStreams || [];
+        return logStreams;
+    } catch (error) {
+        console.error("Error fetching log streams:", error);
+        throw error;
+    }
+};
+
+// getLogEvents
+
+export const getLogEvents = async (logGroupName: string, logStreamName: string) => {
+    try {
+        const credential = (await fetchAuthSession()).credentials;
+        const client = new CloudWatchLogsClient({
+            region: import.meta.env.VITE_APP_AWS_REGION ?? import.meta.env.VITE_LOCAL_AWS_REGION,
+            credentials: credential,
+        });
+
+        const command = new GetLogEventsCommand({
+            logGroupName: logGroupName,
+            logStreamName: logStreamName,
+            startFromHead: true,
+        });
+
+        const response = await client.send(command);
+        const logEvents = response.events || [];
+        return logEvents;
+    } catch (error) {
+        console.error("Error fetching log events:", error);
+        throw error;
     }
 };

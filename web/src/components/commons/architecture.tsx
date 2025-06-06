@@ -226,16 +226,6 @@ const Architecture: React.FC<ArchitectureProps> = ({ title = '' }) => {
             targetHandle: "l",
             label: 'Publish new version',
             labelShowBg: false
-        },
-        {
-            id: "e2-11",
-            source: "2",
-            target: "11",
-            markerEnd: { type: MarkerType.Arrow, width: 20, height: 20, color: "#000000" },
-            sourceHandle: "b",
-            targetHandle: "t",
-            label: 'Push metrics',
-            labelShowBg: false
         }
     ];
 
