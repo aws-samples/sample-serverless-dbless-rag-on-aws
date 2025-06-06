@@ -29,10 +29,11 @@ export const Home = () => {
   const [isUploading, setIsUploading] = useState(false); // ローディング状態を管理
   
   const embeddingFunctionName = import.meta.env.VITE_EMBEDDING_FUNCTION_NAME ?? import.meta.env.VITE_LOCAL_EMBEDDING_FUNCTION_NAME;
-  const [lambdaExecuteLogStreams, setLambdaExecuteLogStreams] = useState<LogStream[]>([]); // APIからの結果を保持する状態
+  const [lambdaExecuteLogStreams, setLambdaExecuteLogStreams] = useState<(LogStream & { status?: string; events?: LogEvent[] })[]>([]); // APIからの結果を保持する状態
   const [selectedLogStream, setSelectedLogStream] = useState<string | null>(null); // 選択されたログストリーム
   const [logEvents, setLogEvents] = useState<LogEvent[]>([]); // ログイベントを保持する状態
   const [isLogModalVisible, setIsLogModalVisible] = useState(false); // ログモーダルの表示状態
+  const [isLoading, setIsLoading] = useState(false); // ログ取得中の状態
 
   const handleUpload = async () => {
     setIsUploading(true);
@@ -62,21 +63,84 @@ export const Home = () => {
   };
   
   // ログストリームをクリックした際の処理
-  const handleLogStreamClick = async (logStreamName: string) => {
+  const handleLogStreamClick = (logStreamName: string, events?: LogEvent[]) => {
     setSelectedLogStream(logStreamName);
-    try {
-      const events = await getLogEvents(`/aws/lambda/${embeddingFunctionName}`, logStreamName);
+    if (events) {
       setLogEvents(events);
       setIsLogModalVisible(true);
+    } else {
+      // イベントがない場合は取得する
+      const logGroupName = `/aws/lambda/${embeddingFunctionName}`;
+      setIsLoading(true);
+      getLogEvents(logGroupName, logStreamName)
+        .then(fetchedEvents => {
+          setLogEvents(fetchedEvents);
+          setIsLogModalVisible(true);
+        })
+        .catch(error => {
+          console.error("Error fetching log events:", error);
+        })
+        .finally(() => {
+          setIsLoading(false);
+        });
+    }
+  };
+
+  // ログストリームのステータスを判定する関数
+  const determineLogStatus = (events: LogEvent[]): string => {
+    const messages = events.map(event => event.message || "");
+    const combinedMessage = messages.join(" ");
+    
+    if (combinedMessage.includes("COMPLETE TASK")) {
+      return "complete";
+    } else if (combinedMessage.includes("ERROR") || combinedMessage.includes("Task timed out")) {
+      return "error";
+    } else {
+      return "processing";
+    }
+  };
+
+  // ログストリームとそのイベントを取得する関数
+  const fetchLogStreamsWithEvents = async () => {
+    setIsLoading(true);
+    try {
+      const logGroupName = "/aws/lambda/" + embeddingFunctionName;
+      const streams = await listLogStreams(logGroupName);
+      
+      // 最新のログストリームが上に来るようにソート
+      const sortedStreams = [...streams].sort((a, b) => {
+        const timeA = a.lastIngestionTime || a.creationTime || 0;
+        const timeB = b.lastIngestionTime || b.creationTime || 0;
+        return timeB - timeA; // 降順ソート
+      });
+      
+      const streamsWithEvents = await Promise.all(
+        sortedStreams.slice(0, 10).map(async (stream) => {
+          if (!stream.logStreamName) return { ...stream, status: "unknown" };
+          
+          try {
+            const events = await getLogEvents(logGroupName, stream.logStreamName);
+            const status = determineLogStatus(events);
+            return { ...stream, status, events };
+          } catch (error) {
+            console.error(`Error fetching events for ${stream.logStreamName}:`, error);
+            return { ...stream, status: "error" };
+          }
+        })
+      );
+      
+      setLambdaExecuteLogStreams(streamsWithEvents);
     } catch (error) {
-      console.error("Error fetching log events:", error);
+      console.error("Error fetching log streams:", error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   useEffect(() => {
     listObject(embeddingBucketName).then(setEmbeddingBucketObjects).catch(console.error);
     listObject(vectorBucketName).then(setVectorBucketObjects).catch(console.error);
-    listLogStreams("/aws/lambda/"+embeddingFunctionName).then(setLambdaExecuteLogStreams).catch(console.error)
+    fetchLogStreamsWithEvents();
     init();
   }, []);
 
@@ -253,24 +317,63 @@ export const Home = () => {
         </Container>
         
         <Container>
-          <Header>
+          <Header
+            actions={
+              <Button onClick={fetchLogStreamsWithEvents} disabled={isLoading}>
+                更新
+              </Button>
+            }
+          >
             取り込み中ログ
           </Header>
           <Table
             enableKeyboardNavigation={true}
             variant="borderless"
             resizableColumns={true}
-            onRowClick={({ detail }) => {
-              if (detail.item.logStreamName) {
-                handleLogStreamClick(detail.item.logStreamName);
-              }
-            }}
+            loading={isLoading}
+            loadingText="ログを取得中..."
+            // 行クリックは無効化し、アイコンボタンでのみ詳細を表示するようにする
             columnDefinitions={[
               {
                 id: "logStreamName",
                 header: "ログストリーム名",
                 cell: item => item.logStreamName || "-",
-                width: 341,
+                width: 250,
+              },
+              {
+                id: "details",
+                header: "詳細",
+                cell: item => (
+                  <Button 
+                    iconName="external" 
+                    variant="icon" 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (item.logStreamName) {
+                        handleLogStreamClick(item.logStreamName, item.events);
+                      }
+                    }}
+                    ariaLabel="ログ詳細を表示"
+                  />
+                ),
+                width: 60,
+              },
+              {
+                id: "status",
+                header: "ステータス",
+                cell: item => {
+                  switch(item.status) {
+                    case "complete":
+                      return <span style={{ color: "green" }}>完了</span>;
+                    case "error":
+                      return <span style={{ color: "red" }}>エラー</span>;
+                    case "processing":
+                      return <span style={{ color: "blue" }}>処理中</span>;
+                    default:
+                      return <span style={{ color: "gray" }}>不明</span>;
+                  }
+                },
+                width: 100,
               },
               {
                 id: "creationTime",
@@ -285,7 +388,7 @@ export const Home = () => {
                 width: 164,
               },
             ]} 
-            items={lambdaExecuteLogStreams.slice(0, 10)}
+            items={lambdaExecuteLogStreams}
           />
         </Container>
 
@@ -298,11 +401,13 @@ export const Home = () => {
         onDismiss={() => setIsLogModalVisible(false)}
         header={`ログストリーム: ${selectedLogStream || ""}`}
         size="large"
+        style={{ maxWidth: "90vw" }}
       >
         <Table
           enableKeyboardNavigation={true}
           variant="borderless"
           resizableColumns={true}
+          wrapLines={true}
           columnDefinitions={[
             {
               id: "timestamp",
@@ -313,11 +418,24 @@ export const Home = () => {
             {
               id: "message",
               header: "メッセージ",
-              cell: item => item.message || "-",
-              width: 600,
+              cell: item => {
+                const message = item.message || "-";
+                const hasError = message.includes("ERROR");
+                return (
+                  <div style={{ 
+                    color: hasError ? "red" : "inherit",
+                    whiteSpace: "pre-wrap",
+                    wordBreak: "break-word",
+                    maxHeight: "none"
+                  }}>
+                    {message}
+                  </div>
+                );
+              },
+              width: 800,
             },
           ]}
-          items={logEvents}
+          items={[...logEvents].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))}
         />
       </Modal>
     </ContentLayout>

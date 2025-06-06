@@ -25,6 +25,8 @@ import { applyTheme, Theme } from '@cloudscape-design/components/theming';
 const theme: Theme = {
     tokens: {
                 fontFamilyBase: "'Helvetica Neue', Roboto, Arial, sans-serif",
+                colorBackgroundChatBubbleIncoming: { light: '{colorBlue400}', dark: '{colorGrey900}' },
+                colorBackgroundChatBubbleOutgoing: { light: '{colorGrey150}', dark: '{colorGrey900}' },
     },
     contexts: {
         'top-navigation': {

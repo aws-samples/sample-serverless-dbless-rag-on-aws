@@ -175,8 +175,6 @@ export class Frontend {
 
 
 
-
-
         const idpoolAuthRoleAttachment = new cognito.CfnIdentityPoolRoleAttachment(scope, 'web-idpool-auth-role-attachment', {
             identityPoolId: idpool.ref,
             roles: {
