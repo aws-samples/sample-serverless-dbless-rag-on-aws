@@ -28,7 +28,7 @@ export const Home = () => {
   const vectorBucketName = import.meta.env.VITE_APP_VECTOR_BUCKET_NAME ?? import.meta.env.VITE_LOCAL_VECTOR_BUCKET_NAME;
   const [isUploading, setIsUploading] = useState(false); // ローディング状態を管理
   
-  const embeddingFunctionName = import.meta.env.VITE_EMBEDDING_FUNCTION_NAME ?? import.meta.env.VITE_LOCAL_EMBEDDING_FUNCTION_NAME;
+  const embeddingFunctionName = import.meta.env.VITE_APP_EMBEDDING_FUNCTION_NAME ?? import.meta.env.VITE_LOCAL_EMBEDDING_FUNCTION_NAME;
   const [lambdaExecuteLogStreams, setLambdaExecuteLogStreams] = useState<(LogStream & { status?: string; events?: LogEvent[] })[]>([]); // APIからの結果を保持する状態
   const [selectedLogStream, setSelectedLogStream] = useState<string | null>(null); // 選択されたログストリーム
   const [logEvents, setLogEvents] = useState<LogEvent[]>([]); // ログイベントを保持する状態
@@ -105,6 +105,7 @@ export const Home = () => {
     setIsLoading(true);
     try {
       const logGroupName = "/aws/lambda/" + embeddingFunctionName;
+      console.log("logGroupName : ", logGroupName)
       const streams = await listLogStreams(logGroupName);
       
       // 最新のログストリームが上に来るようにソート
@@ -401,7 +402,6 @@ export const Home = () => {
         onDismiss={() => setIsLogModalVisible(false)}
         header={`ログストリーム: ${selectedLogStream || ""}`}
         size="large"
-        style={{ maxWidth: "90vw" }}
       >
         <Table
           enableKeyboardNavigation={true}

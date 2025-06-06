@@ -283,7 +283,7 @@ export class CdkStack extends cdk.Stack {
                 searchFunction.functionName,
                 props.generateInitialUser,
                 embeddingFunction.logGroup,
-                embeddingFunction.logGroup.logGroupName,
+                embeddingFunction.functionName,
             );
         }
 

@@ -226,7 +226,7 @@ export class Frontend {
                 VITE_APP_AWS_REGION: cdk.Aws.REGION,
                 VITE_APP_EMBEDDINGS_ASSET_QUEUE_NAME: embeddingQueueName,
                 VITE_APP_SEARCH_FUNCTION_NAME: searchFunctionName,
-                VITE_EMBEDDING_FUNCTION_NAME: embeddingFunctionName
+                VITE_APP_EMBEDDING_FUNCTION_NAME: embeddingFunctionName
             },
         });
 
