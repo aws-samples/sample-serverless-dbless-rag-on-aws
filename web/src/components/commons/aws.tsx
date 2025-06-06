@@ -193,3 +193,4 @@ export const getLogEvents = async (logGroupName: string, logStreamName: string) 
         throw error;
     }
 };
+

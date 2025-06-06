@@ -58,16 +58,11 @@ export const Home = () => {
             }
         >
 
-
-
             <SpaceBetween size="l" direction="vertical">
 
                 <Container>
                     <Architecture title={t("pages.home.architecture")}></Architecture>
                 </Container>
-
-
-
 
                 <Container>
                     <Header variant="h3">{t("pages.dashboard.embeddingprocessqueue")}</Header>
