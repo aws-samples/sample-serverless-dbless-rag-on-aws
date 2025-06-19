@@ -12,9 +12,7 @@ import { useEffect, useState } from "react";
 import LineChart from "@cloudscape-design/components/line-chart";
 import "@xyflow/react/dist/style.css";
 
-import { getMetrics, calculateChartHeight } from '../../commons/aws';
-import { CloudWatchClient, GetMetricStatisticsCommand } from "@aws-sdk/client-cloudwatch";
-import { fetchAuthSession } from "aws-amplify/auth";
+import { getMetrics, calculateChartHeight, getLambdaDurationMetrics } from '../../commons/aws';
 import '../../commons/reactflow.css';
 import { useTranslation } from "react-i18next";
 import Architecture from "../../commons/architecture";
@@ -33,11 +31,11 @@ export const Home = () => {
     const [lambdaDailyStats, setLambdaDailyStats] = useState<{
         date: Date | undefined;
         sumMs: number;
+        durationCostUSD: number;
+        requestCostUSD: number;
         costUSD: number;
         invocations: number;
     }[]>([]);
-
-    const [invocationMetric, setInvocationMetric] = useState<{ x: Date; y: number; }[]>([]); // APIからの結果を保持する状態
 
 
 
@@ -55,76 +53,42 @@ export const Home = () => {
             }], 300, "Sum");
             setLambdaDurationData(durationMetricData!);
 
-            const invocationMetric = await getMetrics(86400, "AWS/Lambda", "Invocations", [{
-                Name: "FunctionName",
-                Value: functionName
-            }], 300, "Sum");
-            setInvocationMetric(invocationMetric!);
-
-
-            // GetMetricStatisticsCommandを使用して日次データを取得
-            const credential = (await fetchAuthSession()).credentials;
-            const cwClient = new CloudWatchClient({
-                region: import.meta.env.VITE_APP_AWS_REGION ?? import.meta.env.VITE_LOCAL_AWS_REGION,
-                credentials: credential,
-            });
-            
-            // 2週間前から現在までの期間を設定
-            const endTime = new Date();
-            const startTime = new Date();
-            startTime.setDate(startTime.getDate() - 14); // 2週間前
-            
-            // Duration統計を取得
-            const durationCommand = new GetMetricStatisticsCommand({
-                Namespace: "AWS/Lambda",
-                MetricName: "Duration",
-                Dimensions: [
-                    {
-                        Name: "FunctionName",
-                        Value: functionName
-                    }
-                ],
-                StartTime: startTime,
-                EndTime: endTime,
-                Period: 86400, // 1日単位（秒）
-                Statistics: ["Sum"]
-            });
-            
-            const durationResponse = await cwClient.send(durationCommand);
-            const durationDataPoints = durationResponse.Datapoints || [];
+            // aws.tsxのgetLambdaDurationMetricsを使用して日次データを取得
+            const durationMetricsResult = await getLambdaDurationMetrics(functionName);
+            const durationDataPoints = durationMetricsResult.dailyData;
             
             // 日付ごとのマップを作成
             const dailyStatsMap = new Map();
             
             // 実行時間データを処理
             durationDataPoints.forEach(point => {
-                if (point.Timestamp) {
-                    dailyStatsMap.set(point.Timestamp.toISOString().split('T')[0], {
-                        date: point.Timestamp,
-                        sumMs: point.Sum || 0,
+                if (point.date) {
+                    dailyStatsMap.set(point.date.toISOString().split('T')[0], {
+                        date: point.date,
+                        sumMs: point.sumMs,
                         invocations: 0
                     });
                 }
             });
             
             // 呼び出し回数データを取得
-            const invocationsCommand = new GetMetricStatisticsCommand({
-                Namespace: "AWS/Lambda",
-                MetricName: "Invocations",
-                Dimensions: [
-                    {
-                        Name: "FunctionName",
-                        Value: functionName
-                    }
-                ],
-                StartTime: startTime,
-                EndTime: endTime,
-                Period: 86400, // 1日単位（秒）
-                Statistics: ["Sum"]
-            });
+            const invocationsMetricData = await getMetrics(
+                86400 * 14, // 2週間分のデータ
+                "AWS/Lambda", 
+                "Invocations", 
+                [{
+                    Name: "FunctionName",
+                    Value: functionName
+                }], 
+                86400, // 1日単位（秒）
+                "Sum"
+            );
             
-            const invocationsResponse = await cwClient.send(invocationsCommand);
-            const invocationsDataPoints = invocationsResponse.Datapoints || [];
+            // getMetricsの結果を適切な形式に変換
+            const invocationsDataPoints = invocationsMetricData?.map(point => ({
+                Timestamp: point.x,
+                Sum: point.y
+            })) || [];
             
             // 呼び出し回数データを処理
             invocationsDataPoints.forEach(point => {
@@ -143,14 +107,17 @@ export const Home = () => {
                 }
             });
             
-            // コスト計算を追加（GB-秒あたり USD 0.0000166667、関数サイズ 2GB）
+            // コスト計算を追加（GB-秒あたり USD 0.0000166667、関数サイズ 2GB、リクエスト100万件あたりUSD 0.20）
             const costPerGBSecond = 0.0000166667;
             const memorySizeGB = 2;
+            const costPerMillionRequests = 0.20;
             
             // マップから配列に変換してコスト計算
             const statsWithCost = Array.from(dailyStatsMap.values()).map(stat => ({
                 ...stat,
-                costUSD: (stat.sumMs / 1000) * costPerGBSecond * memorySizeGB
+                durationCostUSD: (stat.sumMs / 1000) * costPerGBSecond * memorySizeGB,
+                requestCostUSD: (stat.invocations / 1000000) * costPerMillionRequests,
+                costUSD: (stat.sumMs / 1000) * costPerGBSecond * memorySizeGB + (stat.invocations / 1000000) * costPerMillionRequests
             }));
             
             // 日付でソート（降順）
@@ -278,7 +245,7 @@ export const Home = () => {
                         <LineChart
                             series={[
                                 {
-                                    title: "Count",
+                                    title: "duraction (sum/5min)",
                                     type: "line",
                                     data: durationMetric,
                                 },
@@ -321,7 +288,7 @@ export const Home = () => {
                     </Container>
 
                     <Box padding={{ bottom: "s" }}>
-                        <span>料金: GB-秒あたり USD 0.0000166667 / 関数メモリサイズ: 2GB</span>
+                        <span>料金: GB-秒あたり USD 0.0000166667 / 関数メモリサイズ: 2GB / リクエスト 100 万件あたり USD 0.20</span>
                     </Box>
                     <Table
                         columnDefinitions={[
@@ -333,7 +300,7 @@ export const Home = () => {
                             },
                             {
                                 id: "invocations",
-                                header: "問い合わせ回数",
+                                header: "質問回数",
                                 cell: item => item.invocations.toLocaleString(),
                                 sortingField: "invocations"
                             },
@@ -344,8 +311,20 @@ export const Home = () => {
                                 sortingField: "sumMs"
                             },
                             {
+                                id: "durationCostUSD",
+                                header: "実行時間コスト (USD)",
+                                cell: item => item.durationCostUSD.toFixed(8),
+                                sortingField: "durationCostUSD"
+                            },
+                            {
+                                id: "requestCostUSD",
+                                header: "リクエストコスト (USD)",
+                                cell: item => item.requestCostUSD.toFixed(8),
+                                sortingField: "requestCostUSD"
+                            },
+                            {
                                 id: "costUSD",
-                                header: "実行時間にかかる推定コスト (USD)",
+                                header: "合計コスト (USD)",
                                 cell: item => item.costUSD.toFixed(8),
                                 sortingField: "costUSD"
                             }

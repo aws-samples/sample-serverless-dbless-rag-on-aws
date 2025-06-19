@@ -15,7 +15,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { _Object } from "@aws-sdk/client-s3";
 import { useDropzone } from "react-dropzone";
 import { formatBytes } from '../../commons/util';
-import { getLogEvents, listLogStreams, listObject, putObject } from '../../commons/aws';
+import { deleteAllObjects, getLogEvents, listLogStreams, listObject, putObject } from '../../commons/aws';
 import { useTranslation } from "react-i18next";
 import { LogEvent, LogStream } from "@aws-sdk/client-cloudwatch-logs";
 
@@ -34,6 +34,10 @@ export const Home = () => {
   const [logEvents, setLogEvents] = useState<LogEvent[]>([]); // ログイベントを保持する状態
   const [isLogModalVisible, setIsLogModalVisible] = useState(false); // ログモーダルの表示状態
   const [isLoading, setIsLoading] = useState(false); // ログ取得中の状態
+  const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false); // 削除確認モーダルの表示状態
+  const [isDeleting, setIsDeleting] = useState(false); // 削除処理中の状態
+  const [targetBucket, setTargetBucket] = useState<string>(""); // 削除対象のバケット
+  const [deleteResult, setDeleteResult] = useState<{ deleted: number; message: string } | null>(null); // 削除結果
 
   const handleUpload = async () => {
     setIsUploading(true);
@@ -60,6 +64,34 @@ export const Home = () => {
   const init = () => {
     listObject(embeddingBucketName).then(setEmbeddingBucketObjects).catch(console.error);
     listObject(vectorBucketName).then(setVectorBucketObjects).catch(console.error);
+  };
+
+  // 削除確認モーダルを表示する関数
+  const showDeleteConfirmation = (bucketName: string) => {
+    setTargetBucket(bucketName);
+    setDeleteResult(null);
+    setIsDeleteModalVisible(true);
+  };
+
+  // 削除を実行する関数
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    try {
+      const result = await deleteAllObjects(targetBucket);
+      setDeleteResult(result);
+      
+      // 削除後にバケットの内容を再取得
+      if (targetBucket === embeddingBucketName) {
+        listObject(embeddingBucketName).then(setEmbeddingBucketObjects).catch(console.error);
+      } else if (targetBucket === vectorBucketName) {
+        listObject(vectorBucketName).then(setVectorBucketObjects).catch(console.error);
+      }
+    } catch (error) {
+      console.error("Error deleting objects:", error);
+      setDeleteResult({ deleted: 0, message: "削除中にエラーが発生しました" });
+    } finally {
+      setIsDeleting(false);
+    }
   };
   
   // ログストリームをクリックした際の処理
@@ -270,6 +302,15 @@ export const Home = () => {
                 }, 0)
               )
             }
+            actions={
+              <Button 
+                onClick={() => showDeleteConfirmation(embeddingBucketName)} 
+                disabled={assetBucketObjects.length === 0}
+                variant="normal"
+              >
+                全ファイル削除
+              </Button>
+            }
           >
             {t("pages.embedding.uploaded")}
           </Header>
@@ -294,7 +335,17 @@ export const Home = () => {
         </Container>
 
         <Container>
-          <Header>
+          <Header
+            actions={
+              <Button 
+                onClick={() => showDeleteConfirmation(vectorBucketName)} 
+                disabled={vectorBucketObjects.length === 0}
+                variant="normal"
+              >
+                全ファイル削除
+              </Button>
+            }
+          >
             {t("pages.embedding.embeddedindex")}
           </Header>
           <Table
@@ -437,6 +488,54 @@ export const Home = () => {
           ]}
           items={[...logEvents].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))}
         />
+      </Modal>
+
+      {/* 削除確認モーダル */}
+      <Modal
+        visible={isDeleteModalVisible}
+        onDismiss={() => setIsDeleteModalVisible(false)}
+        header={`バケット内のファイルを全て削除`}
+        size="medium"
+        footer={
+          <Box float="right">
+            <SpaceBetween direction="horizontal" size="xs">
+              <Button 
+                variant="link" 
+                onClick={() => setIsDeleteModalVisible(false)}
+                disabled={isDeleting}
+              >
+                キャンセル
+              </Button>
+              <Button 
+                variant="primary" 
+                onClick={handleDelete}
+                disabled={isDeleting}
+              >
+                削除する
+              </Button>
+            </SpaceBetween>
+          </Box>
+        }
+      >
+        <SpaceBetween size="l">
+          {!deleteResult ? (
+            <Box>
+              <p>バケット <strong>{targetBucket}</strong> 内のファイルを全て削除します。</p>
+              <p>この操作は取り消せません。よろしいですか？</p>
+              {isDeleting && (
+                <Box textAlign="center" padding={{ top: "l" }}>
+                  <Spinner />
+                  <Box padding={{ top: "s" }}>削除処理中...</Box>
+                </Box>
+              )}
+            </Box>
+          ) : (
+            <Box>
+              <p>{deleteResult.message}</p>
+              <Button onClick={() => setIsDeleteModalVisible(false)}>閉じる</Button>
+            </Box>
+          )}
+        </SpaceBetween>
       </Modal>
     </ContentLayout>
   );

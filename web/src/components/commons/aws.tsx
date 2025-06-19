@@ -1,7 +1,7 @@
 import {fetchAuthSession} from "aws-amplify/auth";
 import {CloudWatchClient, GetMetricDataCommand, GetMetricStatisticsCommand} from "@aws-sdk/client-cloudwatch";
 import {InvokeCommand, LambdaClient, ListVersionsByFunctionCommand} from "@aws-sdk/client-lambda";
-import {ListObjectsV2Command, PutObjectCommand, S3Client} from "@aws-sdk/client-s3";
+import {DeleteObjectsCommand, ListObjectsV2Command, PutObjectCommand, S3Client} from "@aws-sdk/client-s3";
 import {CloudWatchLogsClient, DescribeLogStreamsCommand, GetLogEventsCommand} from "@aws-sdk/client-cloudwatch-logs";
 
 
@@ -277,3 +277,54 @@ export const getLambdaDurationMetrics = async (functionName: string) => {
     }
 };
 
+/**
+ * S3バケット内のすべてのオブジェクトを削除する関数
+ * @param bucket 削除対象のS3バケット名
+ * @returns 削除結果
+ */
+export const deleteAllObjects = async (bucket: string) => {
+    try {
+        const credential = (await fetchAuthSession()).credentials;
+        const client = new S3Client({
+            region: import.meta.env.VITE_APP_AWS_REGION ?? import.meta.env.VITE_LOCAL_AWS_REGION,
+            credentials: credential,
+        });
+
+        // バケット内のオブジェクトを一覧表示
+        const listResponse = await client.send(
+            new ListObjectsV2Command({
+                Bucket: bucket,
+            })
+        );
+
+        // オブジェクトが存在しない場合は終了
+        if (!listResponse.Contents || listResponse.Contents.length === 0) {
+            return { deleted: 0, message: "バケットは空です" };
+        }
+
+        // 削除対象のオブジェクトを準備
+        const objectsToDelete = listResponse.Contents.map(object => ({
+            Key: object.Key!
+        }));
+
+        // オブジェクトを一括削除
+        const deleteCommand = new DeleteObjectsCommand({
+            Bucket: bucket,
+            Delete: {
+                Objects: objectsToDelete,
+                Quiet: false
+            }
+        });
+
+        const deleteResponse = await client.send(deleteCommand);
+        
+        return {
+            deleted: deleteResponse.Deleted?.length || 0,
+            errors: deleteResponse.Errors || [],
+            message: `${deleteResponse.Deleted?.length || 0}個のファイルを削除しました`
+        };
+    } catch (error) {
+        console.error("Error deleting objects from S3:", error);
+        throw error;
+    }
+};

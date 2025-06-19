@@ -154,7 +154,7 @@ export class Frontend {
         });
 
         idpoolAuthRole.addToPolicy(new aws_iam.PolicyStatement({
-            actions: ['s3:ListBucket','s3:PutObject','s3:GetObject'],
+            actions: ['s3:ListBucket','s3:PutObject','s3:GetObject','s3:DeleteObject','s3:DeleteObjects'],
             resources: [assetBucket.bucketArn , assetBucket.bucketArn + '/*', vectorBucket.bucketArn , vectorBucket.bucketArn + '/*'],
         }));
         idpoolAuthRole.addToPolicy(new aws_iam.PolicyStatement({
