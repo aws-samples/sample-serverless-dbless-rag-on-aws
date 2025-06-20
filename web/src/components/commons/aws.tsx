@@ -1,29 +1,8 @@
 import {fetchAuthSession} from "aws-amplify/auth";
-import {CloudWatchClient, GetMetricDataCommand} from "@aws-sdk/client-cloudwatch";
+import {CloudWatchClient, GetMetricDataCommand, GetMetricStatisticsCommand} from "@aws-sdk/client-cloudwatch";
 import {InvokeCommand, LambdaClient, ListVersionsByFunctionCommand} from "@aws-sdk/client-lambda";
-import {ListObjectsV2Command, PutObjectCommand, S3Client} from "@aws-sdk/client-s3";
-import {CloudWatchLogsClient, DescribeLogStreamsCommand} from "@aws-sdk/client-cloudwatch-logs";
-
-export const listLogStreams = async (logGroupName: string) => {
-    try {
-        const credential = (await fetchAuthSession()).credentials;
-        const client = new CloudWatchLogsClient({
-            region: import.meta.env.VITE_APP_AWS_REGION ?? import.meta.env.VITE_LOCAL_AWS_REGION,
-            credentials: credential,
-        });
-
-        const command = new DescribeLogStreamsCommand({
-            logGroupName: logGroupName,
-        });
-
-        const response = await client.send(command);
-        const logStreams = response.logStreams || [];
-        return logStreams.map(stream => stream.logStreamName);
-    } catch (error) {
-        console.error("Error fetching log streams:", error);
-        throw error;
-    }
-};
+import {DeleteObjectsCommand, ListObjectsV2Command, PutObjectCommand, S3Client} from "@aws-sdk/client-s3";
+import {CloudWatchLogsClient, DescribeLogStreamsCommand, GetLogEventsCommand} from "@aws-sdk/client-cloudwatch-logs";
 
 
 export const putObject = async (bucket:string, keys:File[]) => {
@@ -82,7 +61,10 @@ export const listObject = async (bucket:string) => {
 };
 
 
-export const getMetrics = async (metricDuration: number, nameSpace:string, metricName:string,dimension:[{ Name:string,Value:string}]) => {
+export const getMetrics = async (
+    metricDuration: number, nameSpace:string, metricName:string,dimension:[{ Name:string,Value:string}],
+    period: number, stat:string
+) => {
     try {
         const credential = (await fetchAuthSession()).credentials;
         const client = new CloudWatchClient({
@@ -101,8 +83,8 @@ export const getMetrics = async (metricDuration: number, nameSpace:string, metri
                                 MetricName: metricName,
                                 Dimensions: dimension,
                             },
-                            Period: 60,
-                            Stat: "Average",
+                            Period: period,
+                            Stat: stat, // 指定された統計タイプを使用
                         },
                     },
                 ],
@@ -121,6 +103,27 @@ export const getMetrics = async (metricDuration: number, nameSpace:string, metri
         console.error("Error calling CloudWatch:", error);
         throw error;
     }
+};
+
+/**
+ * メトリクスデータの最大値に基づいてグラフの高さを計算する関数
+ * @param data メトリクスデータ配列
+ * @param margin 最大値に対する余白の割合（デフォルト: 0.1 = 10%）
+ * @returns 適切なグラフの高さ上限値
+ */
+export const calculateChartHeight = (data: { x: Date; y: number }[] | undefined, margin: number = 0.1): number => {
+    if (!data || data.length === 0) {
+        return 50; // デフォルト値
+    }
+    
+    // 最大値を取得
+    const maxValue = Math.max(...data.map(point => point.y));
+    if (maxValue === 0) {
+        return 5; // 最大値が0の場合はデフォルト値を返す
+    }
+
+    // 最大値の1.1倍（10%増し）を返す
+    return maxValue * (1 + margin);
 };
 
 // nosemgrep: configs.rule-id-3
@@ -164,5 +167,164 @@ export const invokeSearchLambda = async (questionString: string) => {
             result: error.message,
             references: [],
         }
+    }
+};
+
+// Lambda 関数の実行ログからまずはストリームを列挙する関数
+export const listLogStreams = async (logGroupName: string) => {
+    try {
+        const credential = (await fetchAuthSession()).credentials;
+        const client = new CloudWatchLogsClient({
+            region: import.meta.env.VITE_APP_AWS_REGION ?? import.meta.env.VITE_LOCAL_AWS_REGION,
+            credentials: credential,
+        });
+
+        const command = new DescribeLogStreamsCommand({
+                logGroupName: logGroupName,
+                orderBy: "LastEventTime",
+        });
+
+        const response = await client.send(command);
+        const logStreams = response.logStreams || [];
+        return logStreams;
+    } catch (error) {
+        console.error("Error fetching log streams:", error);
+        throw error;
+    }
+};
+
+// getLogEvents
+
+export const getLogEvents = async (logGroupName: string, logStreamName: string) => {
+    try {
+        const credential = (await fetchAuthSession()).credentials;
+        const client = new CloudWatchLogsClient({
+            region: import.meta.env.VITE_APP_AWS_REGION ?? import.meta.env.VITE_LOCAL_AWS_REGION,
+            credentials: credential,
+        });
+
+        const command = new GetLogEventsCommand({
+            logGroupName: logGroupName,
+            logStreamName: logStreamName,
+            startFromHead: true,
+        });
+
+        const response = await client.send(command);
+        const logEvents = response.events || [];
+        return logEvents;
+    } catch (error) {
+        console.error("Error fetching log events:", error);
+        throw error;
+    }
+};
+
+
+ // Lambda関数のDurationメトリクスの合計を取得する関数
+export const getLambdaDurationMetrics = async (functionName: string) => {
+    try {
+        const credential = (await fetchAuthSession()).credentials;
+        const client = new CloudWatchClient({
+            region: import.meta.env.VITE_APP_AWS_REGION ?? import.meta.env.VITE_LOCAL_AWS_REGION,
+            credentials: credential,
+        });
+
+        // 2週間前から現在までの期間を設定
+        const endTime = new Date();
+        const startTime = new Date();
+        startTime.setDate(startTime.getDate() - 14); // 2週間前
+
+        const command = new GetMetricStatisticsCommand({
+            Namespace: "AWS/Lambda",
+            MetricName: "Duration",
+            Dimensions: [
+                {
+                    Name: "FunctionName",
+                    Value: functionName
+                }
+            ],
+            StartTime: startTime,
+            EndTime: endTime,
+            Period: 86400, // 1日単位で集計（秒単位）
+            Statistics: ["Sum", "Average", "Maximum"],
+        });
+
+        const response = await client.send(command);
+        
+        // 結果を整形
+        const dataPoints = response.Datapoints || [];
+        const sortedDataPoints = dataPoints.sort((a, b) => 
+            (a.Timestamp?.getTime() || 0) - (b.Timestamp?.getTime() || 0)
+        );
+        
+        // 合計実行時間を計算（ミリ秒単位）
+        const totalDurationMs = dataPoints.reduce((sum, point) => sum + (point.Sum || 0), 0);
+        
+        return {
+            totalDurationMs,
+            averageDurationMs: dataPoints.length > 0 ? 
+                dataPoints.reduce((sum, point) => sum + (point.Average || 0), 0) / dataPoints.length : 0,
+            maxDurationMs: Math.max(...dataPoints.map(point => point.Maximum || 0)),
+            dailyData: sortedDataPoints.map(point => ({
+                date: point.Timestamp,
+                sumMs: point.Sum || 0,
+                avgMs: point.Average || 0,
+                maxMs: point.Maximum || 0
+            }))
+        };
+    } catch (error) {
+        console.error("Error fetching Lambda duration metrics:", error);
+        throw error;
+    }
+};
+
+/**
+ * S3バケット内のすべてのオブジェクトを削除する関数
+ * @param bucket 削除対象のS3バケット名
+ * @returns 削除結果
+ */
+export const deleteAllObjects = async (bucket: string) => {
+    try {
+        const credential = (await fetchAuthSession()).credentials;
+        const client = new S3Client({
+            region: import.meta.env.VITE_APP_AWS_REGION ?? import.meta.env.VITE_LOCAL_AWS_REGION,
+            credentials: credential,
+        });
+
+        // バケット内のオブジェクトを一覧表示
+        const listResponse = await client.send(
+            new ListObjectsV2Command({
+                Bucket: bucket,
+            })
+        );
+
+        // オブジェクトが存在しない場合は終了
+        if (!listResponse.Contents || listResponse.Contents.length === 0) {
+            return { deleted: 0, message: "バケットは空です" };
+        }
+
+        // 削除対象のオブジェクトを準備
+        const objectsToDelete = listResponse.Contents.map(object => ({
+            Key: object.Key!
+        }));
+
+        // オブジェクトを一括削除
+        const deleteCommand = new DeleteObjectsCommand({
+            Bucket: bucket,
+            Delete: {
+                Objects: objectsToDelete,
+                Quiet: false
+            }
+        });
+
+        const deleteResponse = await client.send(deleteCommand);
+        
+        return {
+            deleted: deleteResponse.Deleted?.length || 0,
+            errors: deleteResponse.Errors || [],
+            message: `${deleteResponse.Deleted?.length || 0}個のファイルを削除しました`
+        };
+    } catch (error) {
+        console.error("Error deleting objects from S3:", error);
+        throw error;
     }
 };

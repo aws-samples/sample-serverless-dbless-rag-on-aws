@@ -14,7 +14,7 @@
   },
   "pages": {
     "home": {
-      "title": "Serverless DBless RAG Console",
+      "title": "Serverless DBless RAG",
       "description": "This application is a console for ingesting documents into the deployed RAG and chatting with it.",
       "quickstart": {
         "title": "Quick Start",

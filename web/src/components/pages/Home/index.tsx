@@ -4,7 +4,10 @@ import {
     Header,
     SpaceBetween,
     StatusIndicator,
-    Link
+    Link,
+    Box,
+    ColumnLayout,
+    Icon
 } from "@cloudscape-design/components";
 import { Dispatch, SetStateAction, useEffect, useState } from "react";
 import { listObject } from "../../commons/aws.tsx";
@@ -65,6 +68,41 @@ export const Home = (props: Props) => {
     >
         <SpaceBetween size="l" direction="vertical">
             <Container>
+                <Box margin={"s"}>
+                    <Header variant="h3">これは何？</Header>
+                    <span>このソリューションは、AWS のサーバーレスサービスを使って実現した検索拡張生成（RAG）の実装です。
+                        特に、既存の RAG の実装においてサーバーレスサービスでの実現例が多くない、外部データベース部分を S3 を用いて実現しています。
+                        アーキテクチャを構成するサービスはすべてサーバーレスなサービスで、イベント駆動の形ででリソースを消費するため、運用にかかる金銭コストが極限まで小さい RAG のシステムを提供できます。</span>
+                </Box>
+                <Box margin={"s"}>
+                    <Header variant="h3">メリット</Header>
+                    <ColumnLayout columns={3}>
+                        <Container>
+                            <SpaceBetween size="s" direction="vertical" alignItems="center">
+                                <Icon name="grid-view" variant="subtle" size="large" />
+                                <h2>完全にサーバーレス実装</h2>
+                                インスタンスが存在しないため、従量課金やスケールなどのサーバーレスの恩恵を完全に享受可能
+                            </SpaceBetween>
+                        </Container>
+                        <Container>
+                            <SpaceBetween size="s" direction="vertical" alignItems="center">
+                                <Icon name="shrink" variant="subtle" size="large" />
+                                <h2>維持コストの最小化</h2>
+                                ベクトルデータを S3 上に配置し DB を排除することで維持にかかる主要なコストを S3 に配置したベクトルデータのみに限定
+                            </SpaceBetween>
+                        </Container>
+                        <Container>
+                            <SpaceBetween size="s" direction="vertical" alignItems="center">
+                                <Icon name="group" variant="subtle" size="large" />
+                                <h2>小規模ユースケース特化</h2>
+                                カジュアルな利用に特化することで Lambda 関数上でのベクトル検索と応答生成を実現
+                            </SpaceBetween>
+                        </Container>
+                    </ColumnLayout>
+                </Box>
+            </Container>
+
+            <Container>
                 <Header variant="h3">{t("pages.home.quickstart.title")}</Header>
                 <ul>
                     <p>
@@ -115,9 +153,9 @@ export const Home = (props: Props) => {
             </Container>
 
             <Container>
-            <Header variant="h3">{t("pages.home.architecture")}</Header>
+                <Header variant="h3">{t("pages.home.architecture")}</Header>
                 <Architecture></Architecture>
-            </Container> 
+            </Container>
 
             <Container>
                 <Header variant="h3">{t("pages.home.quickstart.links")}</Header>

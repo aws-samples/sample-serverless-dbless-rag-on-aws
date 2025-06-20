@@ -8,18 +8,18 @@
     "routes": {
       "home": "ホーム",
       "dashboard": "ダッシュボード",
-      "embedding": "ドキュメント埋め込み",
+      "embedding": "ドキュメント取り込み",
       "ragchat": "RAG チャット"
     }
   },
   "pages" :{
     "home" : {
-      "title": "Serverless DBless RAG コンソール",
+      "title": "Serverless DBless RAG",
       "description": "このアプリケーションは、デプロイした RAG へのドキュメントの投入とチャットを行うためのコンソールです。",
       "quickstart": {
         "title": "クイックスタート",
         "step1": "まずは、資料 (PDF) を S3 バケットに入れる必要があります。",
-        "step1link": "ドキュメント埋め込みページに移動",
+        "step1link": "ドキュメント取り込みページに移動",
         "step1failure": "資料が一つも格納されていません",
         "step1success": "資料が格納されています",
         "step2": "資料を S3 バケットに配置すると、埋め込みが自動で始まるので待ちます。",
@@ -40,7 +40,7 @@
       "update": "更新"
     },
     "embedding" : {
-      "title": "ドキュメント埋め込み",
+      "title": "ドキュメント取り込み",
       "description": "このページでは S3 バケットに資料(PDF) をアップロードすると自動で埋め込みが始まります。 \n すでにアップロードした資料と、埋め込み後のインデックスファイルのサイズを確認できます。",
       "upload": "アップロード",
       "draganddrop": "ここにファイルをドラッグ＆ドロップするか、クリックしてファイルを選択してください。",

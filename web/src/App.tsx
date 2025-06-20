@@ -1,13 +1,12 @@
 import "./App.css";
-import {Authenticator} from "@aws-amplify/ui-react";
-import {Amplify} from "aws-amplify";
+import { Authenticator } from "@aws-amplify/ui-react";
+import { Amplify } from "aws-amplify";
 import "@aws-amplify/ui-react/styles.css"; // For cognito login page
-import NorthStarThemeProvider from "@aws-northstar/ui/components/NorthStarThemeProvider";
-import {BrowserRouter, Route, Routes, useNavigate} from "react-router-dom";
+import { BrowserRouter, Route, Routes, useNavigate } from "react-router-dom";
 import {
     SideNavigation,
     TopNavigation,
-    AppLayout
+    AppLayout,
 } from "@cloudscape-design/components";
 
 import Home from "./components/pages/Home";
@@ -18,7 +17,28 @@ import Embedding from "./components/pages/Embedding";
 import "./i18n/configs"; //i18
 import { useTranslation } from "react-i18next";
 import i18n from "i18next";
-import React, {useState} from "react";
+import React, { useState } from "react";
+import '@cloudscape-design/global-styles/index.css';
+
+import { applyTheme, Theme } from '@cloudscape-design/components/theming';
+
+const theme: Theme = {
+    tokens: {
+                fontFamilyBase: "'Helvetica Neue', Roboto, Arial, sans-serif",
+                colorBackgroundChatBubbleIncoming: { light: '{colorBlue400}', dark: '{colorGrey900}' },
+                colorBackgroundChatBubbleOutgoing: { light: '{colorGrey150}', dark: '{colorGrey900}' },
+    },
+    contexts: {
+        'top-navigation': {
+            tokens: {
+                colorBackgroundContainerContent: '#0f141a',
+            },
+        },
+
+    }
+};
+applyTheme({ theme });
+
 
 
 function App() {
@@ -39,11 +59,11 @@ function App() {
 
 
     return (
-        <div style={{width: "100vw"}}>
+        <div style={{ width: "100vw" }}>
             <Authenticator hideSignUp={true}>
-                {({signOut, user}) => (
+                {({ signOut, user }) => (
                     <BrowserRouter>
-                        <MainContent signOut={signOut ?? (() => {}) } username={user?.username ?? "username"} />
+                        <MainContent signOut={signOut ?? (() => { })} username={user?.username ?? "username"} />
                     </BrowserRouter>
                 )}
             </Authenticator>
@@ -66,74 +86,78 @@ function MainContent({ signOut, username }: { signOut: () => void; username: str
 
 
     return <>
-        <NorthStarThemeProvider>
-            <TopNavigation
-                identity={{href: "#", title: t("util.navbar.title")}}
-                utilities={[
-                    {
-                        type: "menu-dropdown",
-                        text: t("util.navbar.lang"),
-                        iconName: "calendar",
-                        items: [
-                            {id: "ja", text: "日本語"},
-                            {id: "en", text: "English"},
-                        ],
-                        onItemClick: (item) => {
-                            changeLanguage(item.detail.id)
-                        },
+        <TopNavigation
+            identity={{ href: "#", title: t("util.navbar.title") }}
+            utilities={[
+                {
+                    type: "menu-dropdown",
+                    text: t("util.navbar.lang"),
+                    iconName: "calendar",
+                    items: [
+                        { id: "ja", text: "日本語" },
+                        { id: "en", text: "English" },
+                    ],
+                    onItemClick: (item) => {
+                        changeLanguage(item.detail.id)
                     },
-                    {
-                        type: "button",
-                        text: username,
-                        iconName: "user-profile",
-                    },
-                    {
-                        type: "button",
-                        text: t("util.navbar.logout"),
-                        iconName: "external",
-                        onClick: signOut,
-                    },
-                ]}
-            />
+                },
+                {
+                    type: "button",
+                    text: username,
+                    iconName: "user-profile",
+                },
+                {
+                    type: "button",
+                    text: t("util.navbar.logout"),
+                    iconName: "external",
+                    onClick: signOut,
+                },
+            ]}
+        />
 
+        <div style={{ background: "#0f141a" }}>
             <AppLayout
                 onNavigationChange={(
-                        { detail }) =>
-                        setNavigationOpen(detail.open)
+                    { detail }) =>
+                    setNavigationOpen(detail.open)
                 }
                 navigationOpen={navigationOpen}
                 navigation={
-                    <SideNavigation
-                        activeHref={activeHref}
-                        onFollow={(event) => {
-                            event.preventDefault(); // デフォルトのリンク動作を防止
-                            if (!event.detail.external) {
+                    // style={{ background: "#0f141a", width: "100%", height: "100%", color:"#ffffff" }}
+                    <div className="awsui-dark-mode" style={{ background: "#0f141a", width: "100%", height: "100%", color:"#ffffff", fontSize:"12px" }}>
+                        <SideNavigation 
+                            activeHref={activeHref}
+                            onFollow={(event) => {
+                                if (!event.detail.external) {
                                 setActiveHref(event.detail.href);
-                                navigate(event.detail.href);  // 手動でルート変更
-                            }
-                        }}
-                        items={[
-                            { type: "link", text: t("util.routes.home"), href: "/" },
-                            { type: "link", text: t("util.routes.embedding"), href: "/embedding" },
-                            { type: "link", text: t("util.routes.ragchat"), href: "/ragchat" },
-                            { type: "link", text: t("util.routes.dashboard"), href: "/dashboard" },
-                        ]}
-                    />
+                                }
+                            }}
+                            header={{
+                                href: '#',
+                                text: 'Side Menu',
+                            }}
+                            items={[
+                                { type: "link", text: t("util.routes.home"), href: "/" },
+                                { type: "link", text: t("util.routes.embedding"), href: "/embedding" },
+                                { type: "link", text: t("util.routes.ragchat"), href: "/ragchat" },
+                                { type: "link", text: t("util.routes.dashboard"), href: "/dashboard" },
+                            ]}
+                        /></div>
                 }
                 toolsHide
                 content={
                     <Routes>
-                        <Route path="/ragchat" element={<Conversation  />} />
+                        <Route path="/ragchat" element={<Conversation />} />
                         <Route path="/dashboard" element={<Dashboard />} />
                         <Route path="/embedding" element={<Embedding />} />
                         <Route path="/" element={<Home setActiveHref={setActiveHref} navigate={navigate} />} />
                     </Routes>
 
                 }
-            >
-            </AppLayout>
+            />
+        </div>
 
-        </NorthStarThemeProvider>
+
     </>
 }
 

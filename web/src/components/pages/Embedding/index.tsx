@@ -5,6 +5,7 @@ import {
   ContentLayout,
   Header,
   Icon,
+  Modal,
   SpaceBetween, Spinner,
   Table,
   TableProps,
@@ -14,8 +15,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { _Object } from "@aws-sdk/client-s3";
 import { useDropzone } from "react-dropzone";
 import { formatBytes } from '../../commons/util';
-import { listObject, putObject } from '../../commons/aws';
+import { deleteAllObjects, getLogEvents, listLogStreams, listObject, putObject } from '../../commons/aws';
 import { useTranslation } from "react-i18next";
+import { LogEvent, LogStream } from "@aws-sdk/client-cloudwatch-logs";
 
 
 export const Home = () => {
@@ -25,7 +27,17 @@ export const Home = () => {
   const embeddingBucketName = import.meta.env.VITE_APP_EMBEDDINGS_ASSET_BUCKET_NAME ?? import.meta.env.VITE_LOCAL_MATERIAL_BUCKET_NAME;
   const vectorBucketName = import.meta.env.VITE_APP_VECTOR_BUCKET_NAME ?? import.meta.env.VITE_LOCAL_VECTOR_BUCKET_NAME;
   const [isUploading, setIsUploading] = useState(false); // ローディング状態を管理
-
+  
+  const embeddingFunctionName = import.meta.env.VITE_APP_EMBEDDING_FUNCTION_NAME ?? import.meta.env.VITE_LOCAL_EMBEDDING_FUNCTION_NAME;
+  const [lambdaExecuteLogStreams, setLambdaExecuteLogStreams] = useState<(LogStream & { status?: string; events?: LogEvent[] })[]>([]); // APIからの結果を保持する状態
+  const [selectedLogStream, setSelectedLogStream] = useState<string | null>(null); // 選択されたログストリーム
+  const [logEvents, setLogEvents] = useState<LogEvent[]>([]); // ログイベントを保持する状態
+  const [isLogModalVisible, setIsLogModalVisible] = useState(false); // ログモーダルの表示状態
+  const [isLoading, setIsLoading] = useState(false); // ログ取得中の状態
+  const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false); // 削除確認モーダルの表示状態
+  const [isDeleting, setIsDeleting] = useState(false); // 削除処理中の状態
+  const [targetBucket, setTargetBucket] = useState<string>(""); // 削除対象のバケット
+  const [deleteResult, setDeleteResult] = useState<{ deleted: number; message: string } | null>(null); // 削除結果
 
   const handleUpload = async () => {
     setIsUploading(true);
@@ -54,9 +66,114 @@ export const Home = () => {
     listObject(vectorBucketName).then(setVectorBucketObjects).catch(console.error);
   };
 
+  // 削除確認モーダルを表示する関数
+  const showDeleteConfirmation = (bucketName: string) => {
+    setTargetBucket(bucketName);
+    setDeleteResult(null);
+    setIsDeleteModalVisible(true);
+  };
+
+  // 削除を実行する関数
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    try {
+      const result = await deleteAllObjects(targetBucket);
+      setDeleteResult(result);
+      
+      // 削除後にバケットの内容を再取得
+      if (targetBucket === embeddingBucketName) {
+        listObject(embeddingBucketName).then(setEmbeddingBucketObjects).catch(console.error);
+      } else if (targetBucket === vectorBucketName) {
+        listObject(vectorBucketName).then(setVectorBucketObjects).catch(console.error);
+      }
+    } catch (error) {
+      console.error("Error deleting objects:", error);
+      setDeleteResult({ deleted: 0, message: "削除中にエラーが発生しました" });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+  
+  // ログストリームをクリックした際の処理
+  const handleLogStreamClick = (logStreamName: string, events?: LogEvent[]) => {
+    setSelectedLogStream(logStreamName);
+    if (events) {
+      setLogEvents(events);
+      setIsLogModalVisible(true);
+    } else {
+      // イベントがない場合は取得する
+      const logGroupName = `/aws/lambda/${embeddingFunctionName}`;
+      setIsLoading(true);
+      getLogEvents(logGroupName, logStreamName)
+        .then(fetchedEvents => {
+          setLogEvents(fetchedEvents);
+          setIsLogModalVisible(true);
+        })
+        .catch(error => {
+          console.error("Error fetching log events:", error);
+        })
+        .finally(() => {
+          setIsLoading(false);
+        });
+    }
+  };
+
+  // ログストリームのステータスを判定する関数
+  const determineLogStatus = (events: LogEvent[]): string => {
+    const messages = events.map(event => event.message || "");
+    const combinedMessage = messages.join(" ");
+    
+    if (combinedMessage.includes("COMPLETE TASK")) {
+      return "complete";
+    } else if (combinedMessage.includes("ERROR") || combinedMessage.includes("Task timed out")) {
+      return "error";
+    } else {
+      return "processing";
+    }
+  };
+
+  // ログストリームとそのイベントを取得する関数
+  const fetchLogStreamsWithEvents = async () => {
+    setIsLoading(true);
+    try {
+      const logGroupName = "/aws/lambda/" + embeddingFunctionName;
+      console.log("logGroupName : ", logGroupName)
+      const streams = await listLogStreams(logGroupName);
+      
+      // 最新のログストリームが上に来るようにソート
+      const sortedStreams = [...streams].sort((a, b) => {
+        const timeA = a.lastIngestionTime || a.creationTime || 0;
+        const timeB = b.lastIngestionTime || b.creationTime || 0;
+        return timeB - timeA; // 降順ソート
+      });
+      
+      const streamsWithEvents = await Promise.all(
+        sortedStreams.slice(0, 10).map(async (stream) => {
+          if (!stream.logStreamName) return { ...stream, status: "unknown" };
+          
+          try {
+            const events = await getLogEvents(logGroupName, stream.logStreamName);
+            const status = determineLogStatus(events);
+            return { ...stream, status, events };
+          } catch (error) {
+            console.error(`Error fetching events for ${stream.logStreamName}:`, error);
+            return { ...stream, status: "error" };
+          }
+        })
+      );
+      
+      setLambdaExecuteLogStreams(streamsWithEvents);
+    } catch (error) {
+      console.error("Error fetching log streams:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
     listObject(embeddingBucketName).then(setEmbeddingBucketObjects).catch(console.error);
     listObject(vectorBucketName).then(setVectorBucketObjects).catch(console.error);
+    fetchLogStreamsWithEvents();
     init();
   }, []);
 
@@ -185,6 +302,15 @@ export const Home = () => {
                 }, 0)
               )
             }
+            actions={
+              <Button 
+                onClick={() => showDeleteConfirmation(embeddingBucketName)} 
+                disabled={assetBucketObjects.length === 0}
+                variant="normal"
+              >
+                全ファイル削除
+              </Button>
+            }
           >
             {t("pages.embedding.uploaded")}
           </Header>
@@ -209,7 +335,17 @@ export const Home = () => {
         </Container>
 
         <Container>
-          <Header>
+          <Header
+            actions={
+              <Button 
+                onClick={() => showDeleteConfirmation(vectorBucketName)} 
+                disabled={vectorBucketObjects.length === 0}
+                variant="normal"
+              >
+                全ファイル削除
+              </Button>
+            }
+          >
             {t("pages.embedding.embeddedindex")}
           </Header>
           <Table
@@ -231,9 +367,176 @@ export const Home = () => {
             columnDefinitions={itemDefinition}
           />
         </Container>
+        
+        <Container>
+          <Header
+            actions={
+              <Button onClick={fetchLogStreamsWithEvents} disabled={isLoading}>
+                更新
+              </Button>
+            }
+          >
+            取り込み中ログ
+          </Header>
+          <Table
+            enableKeyboardNavigation={true}
+            variant="borderless"
+            resizableColumns={true}
+            loading={isLoading}
+            loadingText="ログを取得中..."
+            // 行クリックは無効化し、アイコンボタンでのみ詳細を表示するようにする
+            columnDefinitions={[
+              {
+                id: "logStreamName",
+                header: "ログストリーム名",
+                cell: item => item.logStreamName || "-",
+                width: 250,
+              },
+              {
+                id: "details",
+                header: "詳細",
+                cell: item => (
+                  <Button 
+                    iconName="external" 
+                    variant="icon" 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (item.logStreamName) {
+                        handleLogStreamClick(item.logStreamName, item.events);
+                      }
+                    }}
+                    ariaLabel="ログ詳細を表示"
+                  />
+                ),
+                width: 60,
+              },
+              {
+                id: "status",
+                header: "ステータス",
+                cell: item => {
+                  switch(item.status) {
+                    case "complete":
+                      return <span style={{ color: "green" }}>完了</span>;
+                    case "error":
+                      return <span style={{ color: "red" }}>エラー</span>;
+                    case "processing":
+                      return <span style={{ color: "blue" }}>処理中</span>;
+                    default:
+                      return <span style={{ color: "gray" }}>不明</span>;
+                  }
+                },
+                width: 100,
+              },
+              {
+                id: "creationTime",
+                header: "作成時刻",
+                cell: item => item.creationTime ? new Date(item.creationTime).toLocaleString('ja-JP') : "-",
+                width: 164,
+              },
+              {
+                id: "lastIngestionTime",
+                header: "最終取り込み時刻",
+                cell: item => item.lastIngestionTime ? new Date(item.lastIngestionTime).toLocaleString('ja-JP') : "-",
+                width: 164,
+              },
+            ]} 
+            items={lambdaExecuteLogStreams}
+          />
+        </Container>
 
 
       </SpaceBetween>
+
+      {/* ログイベント表示用モーダル */}
+      <Modal
+        visible={isLogModalVisible}
+        onDismiss={() => setIsLogModalVisible(false)}
+        header={`ログストリーム: ${selectedLogStream || ""}`}
+        size="large"
+      >
+        <Table
+          enableKeyboardNavigation={true}
+          variant="borderless"
+          resizableColumns={true}
+          wrapLines={true}
+          columnDefinitions={[
+            {
+              id: "timestamp",
+              header: "タイムスタンプ",
+              cell: item => item.timestamp ? new Date(item.timestamp).toLocaleString('ja-JP') : "-",
+              width: 200,
+            },
+            {
+              id: "message",
+              header: "メッセージ",
+              cell: item => {
+                const message = item.message || "-";
+                const hasError = message.includes("ERROR");
+                return (
+                  <div style={{ 
+                    color: hasError ? "red" : "inherit",
+                    whiteSpace: "pre-wrap",
+                    wordBreak: "break-word",
+                    maxHeight: "none"
+                  }}>
+                    {message}
+                  </div>
+                );
+              },
+              width: 800,
+            },
+          ]}
+          items={[...logEvents].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))}
+        />
+      </Modal>
+
+      {/* 削除確認モーダル */}
+      <Modal
+        visible={isDeleteModalVisible}
+        onDismiss={() => setIsDeleteModalVisible(false)}
+        header={`バケット内のファイルを全て削除`}
+        size="medium"
+        footer={
+          <Box float="right">
+            <SpaceBetween direction="horizontal" size="xs">
+              <Button 
+                variant="link" 
+                onClick={() => setIsDeleteModalVisible(false)}
+                disabled={isDeleting}
+              >
+                キャンセル
+              </Button>
+              <Button 
+                variant="primary" 
+                onClick={handleDelete}
+                disabled={isDeleting}
+              >
+                削除する
+              </Button>
+            </SpaceBetween>
+          </Box>
+        }
+      >
+        <SpaceBetween size="l">
+          {!deleteResult ? (
+            <Box>
+              <p>バケット <strong>{targetBucket}</strong> 内のファイルを全て削除します。</p>
+              <p>この操作は取り消せません。よろしいですか？</p>
+              {isDeleting && (
+                <Box textAlign="center" padding={{ top: "l" }}>
+                  <Spinner />
+                  <Box padding={{ top: "s" }}>削除処理中...</Box>
+                </Box>
+              )}
+            </Box>
+          ) : (
+            <Box>
+              <p>{deleteResult.message}</p>
+              <Button onClick={() => setIsDeleteModalVisible(false)}>閉じる</Button>
+            </Box>
+          )}
+        </SpaceBetween>
+      </Modal>
     </ContentLayout>
   );
 };
