@@ -176,20 +176,24 @@ export class CdkStack extends cdk.Stack {
                         compatibleArchitectures: [getHostArchitecture()],
                         removalPolicy: cdk.RemovalPolicy.DESTROY,
                         bundling: {
-                            command: [
-                                "bash",
-                                "-c",
-                                "pip install \
-                                --implementation cp \
-                                --python-version 3.12 \
-                                --only-binary=:all: --upgrade \
-                                -r requirements.txt -t /asset-output/python",
-                                'find ./python -name "*.pyc" -delete',
-                                'find ./python -name "*.pyo" -delete',
-                                'find ./python -name "__pycache__" -delete',
-                                'rm -r /asset-output/python/botocore/',
-                                'rm -r /asset-output/python/boto3/',
-                            ]
+                            commandHooks: {
+                                beforeBundling(inputDir: string): string[] {
+                                    return [''];
+                                },
+                                afterBundling(inputDir: string): string[] {
+                                    return [
+                                        "echo '================= after Bundling commands =================='",
+                                        "find ./ -name '*.pyc' -delete",
+                                        "find ./ -name '*.pyo' -delete",
+                                        "find ./ -name '__pycache__' -delete",
+                                        "rm -r botocore/",
+                                        "rm -r boto3/",
+                                        "du -h -d 1",
+                                        "echo '================= Lambda Layer Package size =================='",
+                                        "du -h -d 0",
+                                    ];
+                                },
+                            },
                         }
                     }),
                 ],
