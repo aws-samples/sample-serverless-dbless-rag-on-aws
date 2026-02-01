@@ -10,22 +10,23 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@aws-amplify/ui-react": "^6.5.1",
-    "@aws-northstar/ui": "^1.4.2",
-    "@aws-sdk/client-cloudwatch": "^3.658.1",
-    "@aws-sdk/client-cloudwatch-logs": "^3.658.1",
-    "@aws-sdk/client-lambda": "^3.658.1",
-    "@aws-sdk/client-s3": "^3.658.1",
+    "@aws-amplify/ui-react": "^6.13.2",
+    "@aws-sdk/client-cloudwatch": "^3.980.0",
+    "@aws-sdk/client-cloudwatch-logs": "^3.980.0",
+    "@aws-sdk/client-lambda": "^3.980.0",
+    "@aws-sdk/client-s3": "^3.980.0",
     "@cloudscape-design/chat-components": "^1.0.16",
     "@cloudscape-design/components": "^3.0.812",
+    "@cloudscape-design/global-styles": "^1.0.50",
     "@xyflow/react": "^12.3.1",
-    "aws-amplify": "^6.6.2",
+    "aws-amplify": "^6.16.0",
     "i18next": "^23.16.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-dropzone": "^14.2.3",
     "react-i18next": "^15.0.3",
-    "react-markdown": "^9.0.1"
+    "react-markdown": "^9.0.1",
+    "react-router-dom": "^7.13.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.0",
