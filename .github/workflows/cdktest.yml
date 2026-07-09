@@ -8,6 +8,9 @@ on:
     branches:
     - main
 
+permissions:
+  contents: read
+
 jobs:
   cdk-synth:
     runs-on: ubuntu-latest
