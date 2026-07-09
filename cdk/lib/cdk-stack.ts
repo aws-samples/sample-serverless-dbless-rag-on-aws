@@ -313,7 +313,6 @@ export class CdkStack extends cdk.Stack {
         NagSuppressions.addResourceSuppressionsByPath(this,
             [
                 '/ServerlessRAG/LambdaExecutionRole/DefaultPolicy/Resource',
-                '/ServerlessRAG/BucketNotificationsHandler050a0587b7544547bf325f094a3db834/Role/DefaultPolicy/Resource',
                 '/ServerlessRAG/Custom::CDKECRDeploymentbd07c930edb94112a20f03f096f53666512MiB/ServiceRole/DefaultPolicy/Resource'
             ]
             , [
