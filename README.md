@@ -1,3 +1,7 @@
+> [!IMPORTANT]
+> **This repository has been archived and is now read-only.**
+> It is no longer actively maintained. You can still fork or reference the code, but issues and pull requests are no longer accepted.
+
 # Serverless dbless RAG
 Serverless RAG is an implementation of Retrieval Augumented Generation (RAG) on AWS.
 This solution is composed of AWS CDK resources and React project.
